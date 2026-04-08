@@ -7,6 +7,7 @@ const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",tex
 
 const navItems=[
   {label:"Overview",href:"/app",icon:"O"},
+  {label:"Copilot",href:"/app/copilot",icon:"C"},
   {label:"Leads",href:"/app/leads",icon:"L"},
   {label:"Deals",href:"/app/deals",icon:"D"},
 ]
