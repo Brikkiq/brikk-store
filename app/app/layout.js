@@ -10,6 +10,7 @@ const navItems=[
   {label:"Copilot",href:"/app/copilot",icon:"C"},
   {label:"Leads",href:"/app/leads",icon:"L"},
   {label:"Deals",href:"/app/deals",icon:"D"},
+  {label:"Calendar",href:"/app/calendar",icon:"K"},
 ]
 
 export default function AppLayout({children}){
