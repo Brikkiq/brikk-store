@@ -16,19 +16,20 @@ export async function POST(request) {
       const daysSinceContact = lead.days_since_contact || 0
       const prompt = `You are an AI assistant for a real estate agent named ${agentName || 'Alex'}. 
 
-Write a short, personalized follow-up message for this lead. The message should be sent as a text message or short email. Keep it under 50 words. Be warm, professional, and specific to their situation. Do NOT use generic language like "just checking in." Include something specific and actionable.
+Write a short, personalized follow-up message for this lead. The message should be sent as a text message. Keep it under 40 words. Be warm and professional. Do NOT use phrases like "just checking in" or "just following up." Make it specific and actionable.
 
-Lead details:
+Lead info:
 - Name: ${lead.name}
-- Type: ${lead.lead_type || 'Buyer'}
+- Type: ${lead.lead_type || 'Buyer'} 
 - Source: ${lead.source || 'Unknown'}
 - Temperature: ${lead.temperature || 'warm'}
 - Stage: ${lead.stage || 'New Lead'}
 - Price Range: ${lead.price_range || 'Not specified'}
-- Days Since Last Contact: ${daysSinceContact}
+- Days Since Contact: ${daysSinceContact}
 - Notes: ${lead.notes || 'None'}
 
-Also provide a one-sentence explanation of why this message should be sent now. Format your response as JSON with two fields: "message" and "reason". Return ONLY the JSON, no other text.`
+Respond with ONLY a JSON object, nothing else. No markdown, no code blocks. Just the raw JSON:
+{"message": "your draft message here", "reason": "one sentence explaining why to send this now"}`
 
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -40,20 +41,51 @@ Also provide a one-sentence explanation of why this message should be sent now. 
           },
           body: JSON.stringify({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 300,
+            max_tokens: 200,
             messages: [{ role: 'user', content: prompt }]
           })
         })
 
+        if (!response.ok) {
+          const errText = await response.text()
+          console.error('Anthropic API error:', response.status, errText)
+          drafts.push({
+            lead_id: lead.id,
+            lead_name: lead.name,
+            lead_type: lead.lead_type,
+            temperature: lead.temperature,
+            source: lead.source,
+            stage: lead.stage,
+            days_since_contact: daysSinceContact,
+            channel: daysSinceContact > 7 ? 'Email' : 'Text',
+            urgency: 'high',
+            draft: `Hi ${lead.name}, this is ${agentName || 'Alex'}. I wanted to reach out — are you still looking at properties${lead.price_range ? ' in the ' + lead.price_range + ' range' : ''}? I have some new listings that might be a great fit. Would love to chat when you have a minute.`,
+            reason: `${daysSinceContact} days without contact. Automatic fallback draft generated.`
+          })
+          continue
+        }
+
         const data = await response.json()
         const text = data.content?.[0]?.text || ''
         
-        let parsed
-        try {
-          const cleaned = text.replace(/```json\n?/g, '').replace(/```/g, '').trim()
-          parsed = JSON.parse(cleaned)
-        } catch {
-          parsed = { message: text, reason: 'Follow-up recommended based on contact gap.' }
+        let draftMessage = ''
+        let draftReason = ''
+
+        if (text) {
+          try {
+            const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+            const parsed = JSON.parse(cleaned)
+            draftMessage = parsed.message || ''
+            draftReason = parsed.reason || ''
+          } catch {
+            draftMessage = text.replace(/[{}"]/g, '').replace(/message:|reason:/gi, '').trim()
+            draftReason = `Follow-up needed — ${daysSinceContact} days since last contact.`
+          }
+        }
+
+        if (!draftMessage) {
+          draftMessage = `Hi ${lead.name}, this is ${agentName || 'Alex'}. I wanted to reach out — are you still looking at properties${lead.price_range ? ' in the ' + lead.price_range + ' range' : ''}? I have some updates I think you would find helpful. Let me know when you have a few minutes.`
+          draftReason = `${daysSinceContact} days without contact. Fallback draft generated.`
         }
 
         drafts.push({
@@ -68,11 +100,24 @@ Also provide a one-sentence explanation of why this message should be sent now. 
           urgency: lead.temperature === 'hot' && daysSinceContact >= 2 ? 'high' : 
                    daysSinceContact >= 5 ? 'high' : 
                    daysSinceContact >= 3 ? 'medium' : 'low',
-          draft: parsed.message,
-          reason: parsed.reason
+          draft: draftMessage,
+          reason: draftReason
         })
       } catch (err) {
         console.error('Error generating draft for', lead.name, err)
+        drafts.push({
+          lead_id: lead.id,
+          lead_name: lead.name,
+          lead_type: lead.lead_type,
+          temperature: lead.temperature,
+          source: lead.source,
+          stage: lead.stage,
+          days_since_contact: daysSinceContact,
+          channel: 'Text',
+          urgency: 'high',
+          draft: `Hi ${lead.name}, this is ${agentName || 'Alex'}. Wanted to touch base — I have some new properties that might interest you. When works best for a quick call?`,
+          reason: `${daysSinceContact} days since contact. Fallback draft — please edit before sending.`
+        })
       }
     }
 
