@@ -301,6 +301,32 @@ export default function AppOverview(){
         </div>
       )}
 
+      {/* Referral link */}
+      <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",marginTop:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
+          <div>
+            <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Your Lead Capture Link</div>
+            <div style={{fontSize:12,color:c.sub}}>Share this anywhere — business cards, Instagram, email signature. Leads go straight to your pipeline.</div>
+          </div>
+          <button onClick={()=>{
+            const url=`brikk.store/refer${profile?.id?'?agent='+profile.id:''}`
+            if(navigator.clipboard){navigator.clipboard.writeText(url)}
+          }}
+            style={{background:c.text,border:"none",borderRadius:6,padding:"10px 20px",fontSize:12,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",whiteSpace:"nowrap"}}>
+            Copy Link
+          </button>
+        </div>
+        <div style={{background:c.bg,border:`1px solid ${c.borderLight}`,borderRadius:6,padding:"10px 14px",marginTop:12,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <code style={{fontSize:13,color:c.text,fontFamily:"inherit"}}>brikk.store/refer{profile?.id?`?agent=${profile.id}`:''}</code>
+          <a href={`/refer${profile?.id?'?agent='+profile.id:''}`} target="_blank" style={{fontSize:11,fontWeight:600,color:c.accent,flexShrink:0,marginLeft:12}}>Preview</a>
+        </div>
+        {leads.filter(l=>l.source==='Referral Link').length>0&&(
+          <div style={{fontSize:12,color:c.green,fontWeight:600,marginTop:8}}>
+            {leads.filter(l=>l.source==='Referral Link').length} lead{leads.filter(l=>l.source==='Referral Link').length!==1?'s':''} captured from this link
+          </div>
+        )}
+      </div>
+
       {/* Quick links */}
       <div style={{display:"flex",gap:8,marginTop:20,flexWrap:"wrap"}}>
         <a href="/app/leads" style={{flex:"1 1 140px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"16px",textAlign:"center",textDecoration:"none"}}>
