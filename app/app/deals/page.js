@@ -123,7 +123,7 @@ export default function DealsPage(){
           <div>
             <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Stage</label>
             <select value={form.stage} onChange={e=>setForm({...form,stage:e.target.value})}
-              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,fontFamily:"inherit",boxSizing:"border-box"}}>
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,fontFamily:"inherit",boxSizing:"border-box"}}}>
               {stageOptions.map(s=><option key={s}>{s}</option>)}
             </select>
           </div>
