@@ -3,15 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
-const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",green:"#16803C",greenSoft:"rgba(22,128,60,0.06)",greenBorder:"rgba(22,128,60,0.15)",amber:"#A16207",amberSoft:"rgba(161,98,7,0.06)",red:"#BE123C",redSoft:"rgba(190,18,60,0.06)",purple:"#6D28D9",purpleSoft:"rgba(109,40,217,0.05)"}
-
-const Stat=({label,value,note,color=c.text})=>(
-  <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",flex:"1 1 140px",minWidth:140}}>
-    <div style={{fontSize:10,fontWeight:600,color:c.dim,letterSpacing:"0.04em",textTransform:"uppercase",marginBottom:8}}>{label}</div>
-    <div style={{fontSize:24,fontWeight:700,color,letterSpacing:"-0.02em",lineHeight:1}}>{value}</div>
-    {note&&<div style={{fontSize:11,color:c.sub,marginTop:6}}>{note}</div>}
-  </div>
-)
+const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",green:"#16803C",greenSoft:"rgba(22,128,60,0.06)",greenBorder:"rgba(22,128,60,0.15)",amber:"#A16207",amberSoft:"rgba(161,98,7,0.06)",amberBorder:"rgba(161,98,7,0.15)",red:"#BE123C",redSoft:"rgba(190,18,60,0.06)",redBorder:"rgba(190,18,60,0.12)",purple:"#6D28D9",purpleSoft:"rgba(109,40,217,0.05)",purpleBorder:"rgba(109,40,217,0.12)",accent:"#4338CA"}
 
 const Progress=({value,max,color})=>(
   <div style={{background:"#F0F0EC",borderRadius:3,height:4,width:"100%",overflow:"hidden"}}>
@@ -24,143 +16,309 @@ export default function AppOverview(){
   const [deals,setDeals]=useState([])
   const [profile,setProfile]=useState(null)
   const [loading,setLoading]=useState(true)
+  const [completedActions,setCompletedActions]=useState([])
 
-  useEffect(()=>{
-    loadData()
-  },[])
+  useEffect(()=>{loadData()},[])
 
   const loadData=async()=>{
     const {data:{user}}=await supabase.auth.getUser()
     if(!user)return
-
     const [leadsRes,dealsRes,profileRes]=await Promise.all([
       supabase.from('leads').select('*').order('created_at',{ascending:false}),
       supabase.from('deals').select('*').order('created_at',{ascending:false}),
       supabase.from('profiles').select('*').eq('id',user.id).single()
     ])
-
     setLeads(leadsRes.data||[])
     setDeals(dealsRes.data||[])
     setProfile(profileRes.data)
     setLoading(false)
   }
 
-  const hotLeads=leads.filter(l=>l.temperature==='hot').length
-  const warmLeads=leads.filter(l=>l.temperature==='warm').length
-  const coldLeads=leads.filter(l=>l.temperature==='cold').length
-  const totalCommission=deals.reduce((s,d)=>s+(d.commission||0),0)
-  const goal=profile?.annual_goal||200000
-
   const daysSince=(date)=>{
     if(!date)return 999
-    const d=new Date(date)
-    const now=new Date()
-    return Math.floor((now-d)/(1000*60*60*24))
+    return Math.floor((new Date()-new Date(date))/(1000*60*60*24))
   }
 
-  const urgentLeads=leads.filter(l=>{
+  const daysUntil=(date)=>{
+    if(!date)return null
+    return Math.ceil((new Date(date)-new Date())/(1000*60*60*24))
+  }
+
+  const handleLogContact=async(leadId)=>{
+    const {data:{user}}=await supabase.auth.getUser()
+    if(!user)return
+    await supabase.from('leads').update({last_contact_date:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',leadId)
+    await supabase.from('interactions').insert({user_id:user.id,lead_id:leadId,interaction_type:'contact',notes:'Quick action: logged contact'})
+    setCompletedActions(p=>[...p,`lead-${leadId}`])
+    loadData()
+  }
+
+  const markDone=(actionId)=>{
+    setCompletedActions(p=>[...p,actionId])
+  }
+
+  // Build action items
+  const actions=[]
+
+  // Hot leads needing follow-up (URGENT)
+  leads.forEach(l=>{
     const days=daysSince(l.last_contact_date)
-    return(l.temperature==='hot'&&days>=2)||(l.temperature==='warm'&&days>=5)||(l.temperature==='cold'&&days>=10)
+    if(l.temperature==='hot'&&days>=1){
+      actions.push({
+        id:`lead-${l.id}`,
+        priority:days>=3?'critical':'high',
+        icon:'!',
+        title:`Call ${l.name}`,
+        subtitle:`Hot ${l.lead_type||'lead'} — ${days} day${days!==1?'s':''} since contact`,
+        detail:l.stage&&l.price_range?`${l.stage} / ${l.price_range}`:l.stage||'',
+        color:days>=3?c.red:c.amber,
+        colorSoft:days>=3?c.redSoft:c.amberSoft,
+        colorBorder:days>=3?c.redBorder:c.amberBorder,
+        action:'Log Contact',
+        actionFn:()=>handleLogContact(l.id),
+        link:`/app/messages`,
+        linkLabel:'Message',
+      })
+    }
   })
 
-  const tempColor=(t)=>({hot:{bg:c.redSoft,color:c.red},warm:{bg:c.amberSoft,color:c.amber},cold:{bg:"rgba(26,26,24,0.04)",color:c.dim}}[t]||{bg:c.bg,color:c.dim})
+  // Warm leads going cold
+  leads.forEach(l=>{
+    const days=daysSince(l.last_contact_date)
+    if(l.temperature==='warm'&&days>=3){
+      actions.push({
+        id:`lead-${l.id}`,
+        priority:days>=7?'high':'medium',
+        icon:'→',
+        title:`Follow up: ${l.name}`,
+        subtitle:`Warm ${l.lead_type||'lead'} — ${days} day${days!==1?'s':''} since contact${days>=7?' — going cold':''}`,
+        detail:l.stage&&l.price_range?`${l.stage} / ${l.price_range}`:l.stage||'',
+        color:days>=7?c.red:c.amber,
+        colorSoft:days>=7?c.redSoft:c.amberSoft,
+        colorBorder:days>=7?c.redBorder:c.amberBorder,
+        action:'Log Contact',
+        actionFn:()=>handleLogContact(l.id),
+        link:`/app/messages`,
+        linkLabel:'Message',
+      })
+    }
+  })
 
-  if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading your data...</div>
+  // Deals with close dates approaching
+  deals.forEach(d=>{
+    if(d.close_date){
+      const dLeft=daysUntil(d.close_date)
+      if(dLeft!==null&&dLeft<=14&&dLeft>=-3){
+        let subtitle=''
+        if(dLeft<=0)subtitle='Closing today or overdue!'
+        else if(dLeft<=3)subtitle=`Closing in ${dLeft} day${dLeft!==1?'s':''} — confirm everything is ready`
+        else if(dLeft<=7)subtitle=`${dLeft} days to close — check lender and title status`
+        else subtitle=`${dLeft} days to close — on track`
+
+        actions.push({
+          id:`deal-${d.id}`,
+          priority:dLeft<=3?'critical':dLeft<=7?'high':'medium',
+          icon:'$',
+          title:`${d.address}`,
+          subtitle,
+          detail:`${d.client_name||''}${d.price?' — $'+d.price.toLocaleString():''}${d.commission?' (Commission: $'+d.commission.toLocaleString()+')':''}`,
+          color:dLeft<=3?c.red:dLeft<=7?c.amber:c.green,
+          colorSoft:dLeft<=3?c.redSoft:dLeft<=7?c.amberSoft:c.greenSoft,
+          colorBorder:dLeft<=3?c.redBorder:dLeft<=7?c.amberBorder:c.greenBorder,
+          action:'View Deal',
+          link:'/app/deals',
+          linkLabel:'View Deal',
+        })
+      }
+    }
+  })
+
+  // Copilot reminder if there are leads needing follow-up
+  const leadsNeedingFollowUp=leads.filter(l=>{
+    const d=daysSince(l.last_contact_date)
+    return(l.temperature==='hot'&&d>=1)||(l.temperature==='warm'&&d>=3)||(l.temperature==='cold'&&d>=7)
+  }).length
+
+  if(leadsNeedingFollowUp>0){
+    actions.push({
+      id:'copilot-reminder',
+      priority:'medium',
+      icon:'AI',
+      title:`Copilot has ${leadsNeedingFollowUp} draft${leadsNeedingFollowUp!==1?'s':''} ready`,
+      subtitle:'AI-drafted follow-ups waiting for your approval',
+      detail:'',
+      color:c.purple,
+      colorSoft:c.purpleSoft,
+      colorBorder:c.purpleBorder,
+      action:'Open Copilot',
+      link:'/app/copilot',
+      linkLabel:'Open Copilot',
+    })
+  }
+
+  // Cold leads — low priority
+  leads.forEach(l=>{
+    const days=daysSince(l.last_contact_date)
+    if(l.temperature==='cold'&&days>=10){
+      actions.push({
+        id:`lead-cold-${l.id}`,
+        priority:'low',
+        icon:'?',
+        title:`Re-engage: ${l.name}`,
+        subtitle:`Cold lead — ${days} days. Consider a value-add touchpoint or archive.`,
+        detail:l.stage||'',
+        color:c.dim,
+        colorSoft:c.borderLight,
+        colorBorder:c.border,
+        action:'Log Contact',
+        actionFn:()=>handleLogContact(l.id),
+      })
+    }
+  })
+
+  // Sort by priority
+  const priorityOrder={critical:0,high:1,medium:2,low:3}
+  actions.sort((a,b)=>(priorityOrder[a.priority]||3)-(priorityOrder[b.priority]||3))
+
+  const pendingActions=actions.filter(a=>!completedActions.includes(a.id))
+  const completedCount=completedActions.length
+  const totalCommission=deals.reduce((s,d)=>s+(d.commission||0),0)
+  const goal=profile?.annual_goal||200000
+  const hour=new Date().getHours()
+  const greeting=hour<12?'morning':hour<17?'afternoon':'evening'
+  const firstName=profile?.full_name?profile.full_name.split(' ')[0]:''
+
+  if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading your day...</div>
 
   return(
     <div>
-      <div style={{marginBottom:24}}>
-        <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>Good {new Date().getHours()<12?'morning':new Date().getHours()<17?'afternoon':'evening'}{profile?.full_name?`, ${profile.full_name.split(' ')[0]}`:''}</h1>
-        <p style={{fontSize:13,color:c.sub,margin:0}}>Here's your business at a glance</p>
+      {/* Greeting + summary */}
+      <div style={{marginBottom:20}}>
+        <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 6px"}}>
+          Good {greeting}{firstName?`, ${firstName}`:''}.
+        </h1>
+        <p style={{fontSize:14,color:c.sub,margin:0,lineHeight:1.6}}>
+          {pendingActions.length===0?
+            "You're all caught up. No actions needed right now."
+            :pendingActions.length===1?
+            "You have 1 thing that needs your attention."
+            :`You have ${pendingActions.length} things that need your attention.`
+          }
+        </p>
       </div>
 
-      {/* Stats */}
+      {/* Quick stats row */}
       <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
-        <Stat label="Active Leads" value={leads.length} note={`${hotLeads} hot / ${warmLeads} warm / ${coldLeads} cold`}/>
-        <Stat label="Active Deals" value={deals.length} note={`$${(totalCommission/1000).toFixed(1)}K pending`} color={c.green}/>
-        <Stat label="Need Attention" value={urgentLeads.length} note="Overdue for contact" color={urgentLeads.length>0?c.red:c.green}/>
+        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",flex:"1 1 120px",minWidth:120}}>
+          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:6}}>Actions</div>
+          <div style={{fontSize:20,fontWeight:700,color:pendingActions.length>0?c.red:c.green}}>{pendingActions.length}</div>
+        </div>
+        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",flex:"1 1 120px",minWidth:120}}>
+          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:6}}>Leads</div>
+          <div style={{fontSize:20,fontWeight:700}}>{leads.length}</div>
+        </div>
+        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",flex:"1 1 120px",minWidth:120}}>
+          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:6}}>Deals</div>
+          <div style={{fontSize:20,fontWeight:700,color:c.green}}>{deals.length}</div>
+        </div>
+        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",flex:"1 1 120px",minWidth:120}}>
+          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:6}}>Commission</div>
+          <div style={{fontSize:20,fontWeight:700,color:c.green}}>${(totalCommission/1000).toFixed(1)}K</div>
+        </div>
       </div>
 
-      {/* Goal */}
-      {goal>0&&<div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"16px 20px",marginBottom:20}}>
-        <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+      {/* Goal progress */}
+      {goal>0&&<div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",marginBottom:20}}>
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
           <span style={{fontSize:11,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em"}}>Annual Goal</span>
           <span style={{fontSize:12,fontWeight:600,color:c.green}}>${(totalCommission/1000).toFixed(1)}K of ${(goal/1000).toFixed(0)}K</span>
         </div>
         <Progress value={totalCommission} max={goal} color={c.green}/>
       </div>}
 
-      {/* Urgent leads */}
-      {urgentLeads.length>0&&<div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",marginBottom:20}}>
-        <div style={{fontSize:11,fontWeight:600,color:c.dim,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:14}}>Needs Your Attention</div>
-        {urgentLeads.slice(0,5).map((l,i)=>{
-          const days=daysSince(l.last_contact_date)
-          const tc=tempColor(l.temperature)
-          return(
-            <div key={l.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 12px",marginBottom:4,borderRadius:6,background:c.redSoft,border:`1px solid rgba(190,18,60,0.08)`}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:5,height:5,borderRadius:"50%",background:c.red,flexShrink:0}}/>
-                <span style={{fontSize:12,fontWeight:600,color:c.text}}>{l.name} — {days} days since contact</span>
-              </div>
-              <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:4,background:tc.bg,color:tc.color}}>{l.temperature?.toUpperCase()}</span>
-            </div>
-          )
-        })}
-      </div>}
-
-      {/* Recent leads */}
-      <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",marginBottom:20}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <span style={{fontSize:11,fontWeight:600,color:c.dim,letterSpacing:"0.05em",textTransform:"uppercase"}}>Recent Leads</span>
-          <a href="/app/leads" style={{fontSize:12,fontWeight:600,color:c.text,textDecoration:"none"}}>View All</a>
+      {/* Completed counter */}
+      {completedCount>0&&(
+        <div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"12px 18px",marginBottom:16,display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:24,height:24,borderRadius:"50%",background:c.green,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#fff"}}>{completedCount}</div>
+          <span style={{fontSize:13,fontWeight:600,color:c.green}}>action{completedCount!==1?'s':''} completed this session</span>
         </div>
-        {leads.length===0?
-          <div style={{padding:"20px 0",textAlign:"center",color:c.dim,fontSize:13}}>No leads yet. <a href="/app/leads" style={{color:c.text,fontWeight:600}}>Add your first lead</a></div>
-        :leads.slice(0,5).map((l,i)=>{
-          const days=daysSince(l.last_contact_date)
-          const tc=tempColor(l.temperature)
-          return(
-            <div key={l.id} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 0",borderBottom:i<4?`1px solid ${c.borderLight}`:"none"}}>
-              <div style={{display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:30,height:30,borderRadius:6,background:tc.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:tc.color}}>{l.name?.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
-                <div>
-                  <div style={{fontSize:13,fontWeight:600}}>{l.name}</div>
-                  <div style={{fontSize:11,color:c.dim}}>{l.lead_type} / {l.source} / {l.stage}</div>
+      )}
+
+      {/* Action items */}
+      {pendingActions.length>0?(
+        <div>
+          <div style={{fontSize:11,fontWeight:600,color:c.dim,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:14}}>Your Actions</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {pendingActions.map((a,i)=>(
+              <div key={a.id} style={{background:c.white,border:`1px solid ${a.priority==='critical'?a.colorBorder:c.border}`,borderRadius:8,padding:"16px 18px",borderLeft:`4px solid ${a.color}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12,flexWrap:"wrap"}}>
+                  <div style={{flex:1,minWidth:200}}>
+                    <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                      <div style={{width:24,height:24,borderRadius:6,background:a.colorSoft,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,fontWeight:700,color:a.color,flexShrink:0}}>{a.icon}</div>
+                      <span style={{fontSize:14,fontWeight:600}}>{a.title}</span>
+                      {a.priority==='critical'&&<span style={{fontSize:9,fontWeight:700,color:c.red,background:c.redSoft,padding:"2px 6px",borderRadius:3,textTransform:"uppercase"}}>Urgent</span>}
+                    </div>
+                    <div style={{fontSize:12,color:c.sub,lineHeight:1.5,marginLeft:32}}>{a.subtitle}</div>
+                    {a.detail&&<div style={{fontSize:11,color:c.dim,marginLeft:32,marginTop:2}}>{a.detail}</div>}
+                  </div>
+                  <div style={{display:"flex",gap:6,flexShrink:0}}>
+                    {a.actionFn&&(
+                      <button onClick={a.actionFn}
+                        style={{background:c.green,border:"none",borderRadius:6,padding:"8px 16px",fontSize:12,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>
+                        {a.action}
+                      </button>
+                    )}
+                    {a.link&&(
+                      <a href={a.link}
+                        style={{background:a.actionFn?c.bg:c.text,border:a.actionFn?`1px solid ${c.border}`:"none",borderRadius:6,padding:"8px 16px",fontSize:12,fontWeight:600,color:a.actionFn?c.sub:"#fff",textDecoration:"none",display:"flex",alignItems:"center"}}>
+                        {a.linkLabel||'View'}
+                      </a>
+                    )}
+                    <button onClick={()=>markDone(a.id)}
+                      style={{background:"transparent",border:`1px solid ${c.border}`,borderRadius:6,padding:"8px 12px",fontSize:12,fontWeight:500,color:c.dim,cursor:"pointer",fontFamily:"inherit"}}>
+                      Done
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:4,background:tc.bg,color:tc.color}}>{l.temperature?.toUpperCase()}</span>
-                <span style={{fontSize:12,fontWeight:600,color:days>=5?c.red:days>=3?c.amber:c.dim}}>{days===0?"Today":`${days}d`}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Recent deals */}
-      <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px"}}>
-        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-          <span style={{fontSize:11,fontWeight:600,color:c.dim,letterSpacing:"0.05em",textTransform:"uppercase"}}>Active Deals</span>
-          <a href="/app/deals" style={{fontSize:12,fontWeight:600,color:c.text,textDecoration:"none"}}>View All</a>
-        </div>
-        {deals.length===0?
-          <div style={{padding:"20px 0",textAlign:"center",color:c.dim,fontSize:13}}>No deals yet. <a href="/app/deals" style={{color:c.text,fontWeight:600}}>Add your first deal</a></div>
-        :deals.map((d,i)=>(
-          <div key={d.id} style={{padding:"12px 14px",marginBottom:8,borderRadius:6,border:`1px solid ${c.border}`,background:c.bg}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <div>
-                <div style={{fontSize:13,fontWeight:600}}>{d.address}</div>
-                <div style={{fontSize:11,color:c.dim}}>{d.client_name}{d.close_date?` / Closing ${new Date(d.close_date).toLocaleDateString()}`:''}</div>
-              </div>
-              <span style={{fontSize:13,fontWeight:700,color:c.green}}>${d.price?.toLocaleString()}</span>
-            </div>
-            <Progress value={d.progress||0} max={100} color={c.green}/>
-            <div style={{display:"flex",justifyContent:"space-between",marginTop:6}}>
-              <span style={{fontSize:11,color:c.sub}}>{d.stage}</span>
-              {d.commission&&<span style={{fontSize:11,color:c.dim}}>Commission: ${d.commission?.toLocaleString()}</span>}
-            </div>
+            ))}
           </div>
-        ))}
+        </div>
+      ):(
+        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"40px 20px",textAlign:"center"}}>
+          {leads.length===0&&deals.length===0?(
+            <>
+              <div style={{fontSize:16,fontWeight:600,marginBottom:8}}>Welcome to Brikk</div>
+              <div style={{fontSize:13,color:c.sub,marginBottom:16,lineHeight:1.6}}>Start by adding your leads. Once you have leads and deals, this screen will tell you exactly what to do every day.</div>
+              <a href="/app/leads" style={{fontSize:13,fontWeight:600,color:"#fff",background:c.text,padding:"10px 22px",borderRadius:6,textDecoration:"none"}}>Add Your First Lead</a>
+            </>
+          ):(
+            <>
+              <div style={{fontSize:16,fontWeight:600,color:c.green,marginBottom:8}}>All caught up</div>
+              <div style={{fontSize:13,color:c.sub}}>No actions needed right now. Check back later or add more leads to grow your pipeline.</div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Quick links */}
+      <div style={{display:"flex",gap:8,marginTop:20,flexWrap:"wrap"}}>
+        <a href="/app/leads" style={{flex:"1 1 140px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"16px",textAlign:"center",textDecoration:"none"}}>
+          <div style={{fontSize:14,fontWeight:600,color:c.text}}>Add Lead</div>
+          <div style={{fontSize:11,color:c.dim,marginTop:4}}>New prospect</div>
+        </a>
+        <a href="/app/deals" style={{flex:"1 1 140px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"16px",textAlign:"center",textDecoration:"none"}}>
+          <div style={{fontSize:14,fontWeight:600,color:c.text}}>Add Deal</div>
+          <div style={{fontSize:11,color:c.dim,marginTop:4}}>Under contract</div>
+        </a>
+        <a href="/app/copilot" style={{flex:"1 1 140px",background:c.purpleSoft,border:`1px solid ${c.purpleBorder}`,borderRadius:8,padding:"16px",textAlign:"center",textDecoration:"none"}}>
+          <div style={{fontSize:14,fontWeight:600,color:c.purple}}>AI Copilot</div>
+          <div style={{fontSize:11,color:c.dim,marginTop:4}}>Draft follow-ups</div>
+        </a>
+        <a href="/app/messages" style={{flex:"1 1 140px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"16px",textAlign:"center",textDecoration:"none"}}>
+          <div style={{fontSize:14,fontWeight:600,color:c.text}}>Messages</div>
+          <div style={{fontSize:11,color:c.dim,marginTop:4}}>Text your leads</div>
+        </a>
       </div>
     </div>
   )
