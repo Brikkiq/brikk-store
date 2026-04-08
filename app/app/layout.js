@@ -12,6 +12,7 @@ const navItems=[
   {label:"Deals",href:"/app/deals",icon:"D"},
   {label:"Calendar",href:"/app/calendar",icon:"K"},
   {label:"Marketing",href:"/app/marketing",icon:"M"},
+  {label:"Messages",href:"/app/messages",icon:"T"},
 ]
 
 export default function AppLayout({children}){
