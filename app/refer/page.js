@@ -30,37 +30,30 @@ export default function ReferPage(){
 
   const handleSubmit=async()=>{
     if(!form.name||!form.phone){setError('Please enter your name and phone number.');return}
-    
-    let agentId=form.agent_id
-    
-    // If no agent specified, use first agent (for single-agent setup)
-    if(!agentId&&agents.length>0){
-      agentId=agents[0].id
-    }
-
-    if(!agentId){setError('No agent found. Please contact us directly.');return}
-
     setError(null)
 
-    const {error:insertError}=await supabase.from('leads').insert({
-      user_id:agentId,
-      name:form.name,
-      phone:form.phone,
-      email:form.email||null,
-      source:'Referral Link',
-      temperature:'warm',
-      stage:'New Lead',
-      lead_type:form.type,
-      price_range:form.price||null,
-      notes:form.notes?`[Submitted via referral link] ${form.notes}`:'[Submitted via referral link]',
-      last_contact_date:new Date().toISOString()
-    })
-
-    if(insertError){
-      console.error('Submit error:',insertError)
+    try{
+      const res=await fetch('/api/refer',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          name:form.name,
+          phone:form.phone,
+          email:form.email||null,
+          type:form.type,
+          price:form.price||null,
+          notes:form.notes?`[Submitted via referral link] ${form.notes}`:'[Submitted via referral link]',
+          agent_id:form.agent_id||(agents.length>0?agents[0].id:null)
+        })
+      })
+      const data=await res.json()
+      if(data.error){
+        setError('Something went wrong. Please try again or call directly.')
+      }else{
+        setSubmitted(true)
+      }
+    }catch(err){
       setError('Something went wrong. Please try again or call directly.')
-    }else{
-      setSubmitted(true)
     }
   }
 

@@ -143,14 +143,36 @@ export default function Home(){
   const [email,setEmail]=useState("")
   const [submitted,setSubmitted]=useState(false)
   const [openFaq,setOpenFaq]=useState(null)
+  const [chatOpen,setChatOpen]=useState(false)
+  const [chatMsg,setChatMsg]=useState("")
+  const [chatHistory,setChatHistory]=useState([{role:'assistant',content:"Hey! I'm Brikk's AI assistant. Ask me anything about the product — pricing, features, how it works, whatever you need."}])
+  const [chatLoading,setChatLoading]=useState(false)
   const handleSubmit=()=>{if(email.includes("@"))setSubmitted(true)}
+
+  const handleChat=async()=>{
+    if(!chatMsg.trim()||chatLoading)return
+    const userMsg=chatMsg.trim()
+    setChatHistory(p=>[...p,{role:'user',content:userMsg}])
+    setChatMsg("");setChatLoading(true)
+    try{
+      const res=await fetch('/api/copilot',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({mode:'help_chat',question:userMsg})
+      })
+      const data=await res.json()
+      setChatHistory(p=>[...p,{role:'assistant',content:data.answer||"Sorry, I couldn't process that. Try asking another way."}])
+    }catch(err){
+      setChatHistory(p=>[...p,{role:'assistant',content:"Something went wrong. Please try again."}])
+    }
+    setChatLoading(false)
+  }
 
   const faqs=[
     {q:"Is this another CRM?",a:"No. Brikk is the one screen you open every morning that tells you what to do. It's simpler than a CRM, smarter than a spreadsheet, and costs a fraction of what you're paying now."},
     {q:"How does AI Copilot work?",a:"Copilot reads each lead's full context — their temperature, how long since you've been in touch, their stage, their notes — and drafts a personalized message. You tap approve, edit, or skip. That's it."},
     {q:"Can I actually text leads from the app?",a:"Yes. Brikk has a built-in messaging system. You can draft messages manually or let AI write them, then send directly to your lead's phone number. SMS delivery is included."},
     {q:"Does it work on my phone?",a:"Yes. Brikk is a Progressive Web App. Add it to your home screen on iPhone or Android and it works like a native app with a bottom tab bar. No app store needed."},
-    {q:"Is the first 2 months really free?",a:"Yes. No credit card to start. Full access to every feature for 45 days. If it doesn't help you close more deals, you owe nothing."},
+    {q:"Is the first 45 days really free?",a:"Yes. No credit card to start. Full access to every feature for 45 days. If it doesn't help you close more deals, you owe nothing."},
     {q:"How is this different from Lofty or Follow Up Boss?",a:"Those platforms cost $300-500/month, require hours of training, and are built for large brokerages. Brikk is $75/month, takes 5 minutes to set up, and is built for solo agents and small teams who want AI that actually does things — not just stores data."},
     {q:"What about my existing leads?",a:"Add them manually in about 2 minutes each, or share your referral link and new leads flow in automatically. We're building CSV import for the next update."},
     {q:"Does the AI learn over time?",a:"The more you use Brikk, the more context AI has about your leads, your deals, and your patterns. After 90 days, it knows your business better than any CRM you've ever used."},
@@ -384,6 +406,32 @@ export default function Home(){
           <a href="/terms" style={{fontSize:12,color:c.sub}}>Terms</a>
         </div>
       </footer>
+
+      {/* AI Help Chat Widget */}
+      {!chatOpen&&<button onClick={()=>setChatOpen(true)} style={{position:"fixed",bottom:24,right:24,width:56,height:56,borderRadius:"50%",background:c.text,border:"none",boxShadow:"0 4px 20px rgba(0,0,0,0.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>}
+
+      {chatOpen&&<div className="scale-in" style={{position:"fixed",bottom:24,right:24,width:360,maxWidth:"calc(100vw - 32px)",height:480,maxHeight:"calc(100vh - 48px)",background:c.white,border:`1px solid ${c.border}`,borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.12)",display:"flex",flexDirection:"column",zIndex:100,overflow:"hidden"}}>
+        <div style={{padding:"16px 20px",borderBottom:`1px solid ${c.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
+          <div><div style={{fontSize:14,fontWeight:700}}>Ask Brikk</div><div style={{fontSize:11,color:c.dim}}>AI-powered answers</div></div>
+          <button onClick={()=>setChatOpen(false)} style={{background:"none",border:"none",fontSize:18,color:c.dim,cursor:"pointer",padding:"4px"}}>×</button>
+        </div>
+        <div style={{flex:1,overflow:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
+          {chatHistory.map((m,i)=>(
+            <div key={i} style={{display:"flex",justifyContent:m.role==='user'?"flex-end":"flex-start"}}>
+              <div style={{maxWidth:"85%",padding:"10px 14px",borderRadius:m.role==='user'?"12px 12px 2px 12px":"12px 12px 12px 2px",background:m.role==='user'?c.text:c.bg,color:m.role==='user'?"#fff":c.text,fontSize:13,lineHeight:1.6}}>{m.content}</div>
+            </div>
+          ))}
+          {chatLoading&&<div style={{display:"flex",justifyContent:"flex-start"}}><div style={{padding:"10px 14px",borderRadius:"12px 12px 12px 2px",background:c.bg,fontSize:13,color:c.dim,animation:"pulse 1.2s ease-in-out infinite"}}>Thinking...</div></div>}
+        </div>
+        <div style={{padding:"12px 16px",borderTop:`1px solid ${c.border}`,display:"flex",gap:8,flexShrink:0}}>
+          <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleChat()}} placeholder="Ask anything about Brikk..."
+            style={{flex:1,padding:"10px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit"}}/>
+          <button onClick={handleChat} disabled={!chatMsg.trim()||chatLoading}
+            style={{background:c.text,border:"none",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:chatMsg.trim()&&!chatLoading?1:0.5}}>Send</button>
+        </div>
+      </div>}
     </div>
   )
 }

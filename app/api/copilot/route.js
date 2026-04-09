@@ -54,6 +54,48 @@ Return ONLY the JSON, no other text.`
       }
     }
 
+    // Help chat mode — landing page AI assistant
+    if (body.mode === 'help_chat') {
+      const { question } = body
+      if (!question) return NextResponse.json({ answer: "Ask me anything about Brikk!" })
+
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_KEY,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 300,
+            system: `You are the AI assistant on Brikk's website (brikk.store). Brikk is an AI-powered command center for real estate agents. 
+
+Key facts about Brikk:
+- Price: $75/month for Pro (solo agents), $200/month for Teams (up to 5 agents)
+- One-time setup fee: $125
+- Free trial: 45 days, no credit card required
+- Features: AI Copilot (drafts follow-up messages), Lead Pipeline, Deal Tracker, Smart Calendar, Marketing ROI, Messages (SMS), Voice-to-CRM, Lead Capture Link
+- The AI reads conversation history and gets smarter over time
+- Built for solo agents and small teams who can't afford $300-500/month platforms like Lofty or BoldTrail
+- Works on iPhone, Android, and desktop
+- Data is secured with row-level security — each agent only sees their own data
+- SMS messaging via Twilio
+- Privacy policy: brikk.store/privacy
+
+Be helpful, warm, concise. Keep answers under 3 sentences unless they ask for detail. Never make up features that don't exist. If you don't know something, say "Great question — email brikkiq@gmail.com and we'll get back to you." Don't use bullet points. Sound like a real person, not a corporate bot.`,
+            messages: [{ role: 'user', content: question }]
+          })
+        })
+        const data = await res.json()
+        const answer = data.content?.[0]?.text || "Sorry, I couldn't process that. Try asking another way."
+        return NextResponse.json({ answer })
+      } catch (err) {
+        return NextResponse.json({ answer: "I'm having trouble connecting right now. Email brikkiq@gmail.com and we'll help you out." })
+      }
+    }
+
     // Original copilot draft mode
     const { leads, agentName } = body
 
