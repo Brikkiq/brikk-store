@@ -380,6 +380,8 @@ export default function Home(){
           <a href="/login" style={{fontSize:12,color:c.sub}}>Sign In</a>
           <a href="/demo" style={{fontSize:12,color:c.sub}}>Full Demo</a>
           <a href="/refer" style={{fontSize:12,color:c.sub}}>Referral Form</a>
+          <a href="/privacy" style={{fontSize:12,color:c.sub}}>Privacy</a>
+          <a href="/terms" style={{fontSize:12,color:c.sub}}>Terms</a>
         </div>
       </footer>
     </div>

@@ -19,7 +19,11 @@ export default function DealsPage(){
   const [loading,setLoading]=useState(true)
   const [showForm,setShowForm]=useState(false)
   const [editId,setEditId]=useState(null)
+  const [saving,setSaving]=useState(false)
+  const [toast,setToast]=useState(null)
   const [form,setForm]=useState({address:'',client_name:'',price:'',commission:'',close_date:'',stage:'Contract',notes:''})
+
+  const showToast=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),3000)}
 
   useEffect(()=>{loadDeals()},[])
 
@@ -31,6 +35,7 @@ export default function DealsPage(){
   const handleSave=async()=>{
     const {data:{user}}=await supabase.auth.getUser()
     if(!user)return
+    setSaving(true)
     const saveData={
       ...form,
       price:parseFloat(form.price)||0,
@@ -38,12 +43,18 @@ export default function DealsPage(){
       progress:stageProgress[form.stage]||0,
       user_id:user.id
     }
-    if(editId){
-      const {user_id,...updateData}=saveData
-      await supabase.from('deals').update({...updateData,updated_at:new Date().toISOString()}).eq('id',editId)
-    }else{
-      await supabase.from('deals').insert(saveData)
-    }
+    try{
+      if(editId){
+        const {user_id,...updateData}=saveData
+        await supabase.from('deals').update({...updateData,updated_at:new Date().toISOString()}).eq('id',editId)
+        showToast('Deal updated')
+      }else{
+        await supabase.from('deals').insert(saveData)
+        showToast('Deal added')
+      }
+      if(window.brikk?.haptic)window.brikk.haptic('success')
+    }catch(err){showToast('Something went wrong','error')}
+    setSaving(false)
     setForm({address:'',client_name:'',price:'',commission:'',close_date:'',stage:'Contract',notes:''})
     setShowForm(false);setEditId(null);loadDeals()
   }
@@ -56,6 +67,7 @@ export default function DealsPage(){
   const handleDelete=async(id)=>{
     if(!confirm('Delete this deal?'))return
     await supabase.from('deals').delete().eq('id',id)
+    showToast('Deal deleted')
     loadDeals()
   }
 
@@ -73,10 +85,11 @@ export default function DealsPage(){
   const totalCommission=deals.reduce((s,d)=>s+(d.commission||0),0)
   const totalValue=deals.reduce((s,d)=>s+(d.price||0),0)
 
-  if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading deals...</div>
+  if(loading)return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Loading deals...</div><style>{`@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style></div>
 
   return(
-    <div>
+    <div className="page-content">
+      {toast&&<div className="toast" style={{position:"fixed",top:80,right:20,zIndex:200,background:toast.type==='error'?"rgba(190,18,60,0.06)":"rgba(22,128,60,0.06)",border:`1px solid ${toast.type==='error'?'rgba(190,18,60,0.15)':"rgba(22,128,60,0.15)"}`,borderRadius:8,padding:"12px 20px",fontSize:13,fontWeight:600,color:toast.type==='error'?"#BE123C":"#16803C",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{toast.msg}</div>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
           <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>Deals</h1>
@@ -134,9 +147,9 @@ export default function DealsPage(){
             style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={handleSave} disabled={!form.address}
-            style={{background:c.text,border:"none",borderRadius:6,padding:"10px 24px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:form.address?1:0.5}}>
-            {editId?'Update Deal':'Add Deal'}
+          <button onClick={handleSave} disabled={!form.address||saving}
+            style={{background:c.text,border:"none",borderRadius:6,padding:"10px 24px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:form.address&&!saving?1:0.5}}>
+            {saving?'Saving...':editId?'Update Deal':'Add Deal'}
           </button>
           <button onClick={()=>{setShowForm(false);setEditId(null)}}
             style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:6,padding:"10px 24px",fontSize:13,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>

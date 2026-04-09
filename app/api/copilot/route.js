@@ -4,7 +4,58 @@ const ANTHROPIC_KEY = 'sk-ant-api03-32B5YkpOiYscwGBYto1CSjEV_Z_Icsdg1oFsIjBu6Yqe
 
 export async function POST(request) {
   try {
-    const { leads, agentName } = await request.json()
+    const body = await request.json()
+
+    // Voice-to-CRM extraction mode
+    if (body.mode === 'voice_extract') {
+      const { transcript } = body
+      if (!transcript) return NextResponse.json({ extraction: null })
+
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_KEY,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-20250514',
+            max_tokens: 500,
+            messages: [{
+              role: 'user',
+              content: `You are an AI assistant for a real estate CRM. Extract structured data from this voice note by a real estate agent.
+
+Voice transcript: "${transcript}"
+
+Return ONLY valid JSON with these fields (use null for anything not mentioned):
+{
+  "new_lead_name": "name if a new person is mentioned",
+  "lead_name": "name if referring to an existing lead",
+  "action": "what was done or needs to be done",
+  "price": "any price mentioned",
+  "notes": "summary of the note for CRM",
+  "lead_type": "Buyer or Seller if clear",
+  "phone": "phone number if mentioned",
+  "raw": "the original transcript cleaned up"
+}
+
+Return ONLY the JSON, no other text.`
+            }]
+          })
+        })
+        const data = await res.json()
+        const text = data.content?.[0]?.text || '{}'
+        const clean = text.replace(/```json|```/g, '').trim()
+        const extraction = JSON.parse(clean)
+        return NextResponse.json({ extraction })
+      } catch (err) {
+        return NextResponse.json({ extraction: { raw: transcript, note: 'Could not extract structured data.' } })
+      }
+    }
+
+    // Original copilot draft mode
+    const { leads, agentName } = body
 
     if (!leads || leads.length === 0) {
       return NextResponse.json({ drafts: [] })

@@ -154,7 +154,7 @@ export default function CalendarPage(){
   const upcomingEvents=events.filter(e=>e.dateLabel!=='Today'&&e.dateLabel!=='NOW')
   const typeLabels={followup:'Follow Up',closing:'Closing',milestone:'Milestone'}
 
-  if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading calendar...</div>
+  if(loading)return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Loading calendar...</div><style>{`@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style></div>
 
   return(
     <div>

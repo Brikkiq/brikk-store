@@ -17,6 +17,11 @@ export default function AppOverview(){
   const [profile,setProfile]=useState(null)
   const [loading,setLoading]=useState(true)
   const [completedActions,setCompletedActions]=useState([])
+  const [recording,setRecording]=useState(false)
+  const [transcript,setTranscript]=useState('')
+  const [voiceProcessing,setVoiceProcessing]=useState(false)
+  const [voiceResult,setVoiceResult]=useState(null)
+  const [showVoice,setShowVoice]=useState(false)
 
   useEffect(()=>{loadData()},[])
 
@@ -55,6 +60,73 @@ export default function AppOverview(){
 
   const markDone=(actionId)=>{
     setCompletedActions(p=>[...p,actionId])
+  }
+
+  // Voice-to-CRM
+  const startRecording=()=>{
+    const SR=window.SpeechRecognition||window.webkitSpeechRecognition
+    if(!SR){alert('Voice not supported in this browser');return}
+    const recognition=new SR()
+    recognition.continuous=true
+    recognition.interimResults=true
+    recognition.lang='en-US'
+    let final=''
+    recognition.onresult=(e)=>{
+      let interim=''
+      for(let i=e.resultIndex;i<e.results.length;i++){
+        if(e.results[i].isFinal)final+=e.results[i][0].transcript+' '
+        else interim+=e.results[i][0].transcript
+      }
+      setTranscript(final+interim)
+    }
+    recognition.onerror=(e)=>{console.error('Speech error:',e.error);setRecording(false)}
+    recognition.onend=()=>{if(recording)recognition.start()}
+    recognition.start()
+    setRecording(true)
+    setShowVoice(true)
+    setTranscript('')
+    setVoiceResult(null)
+    window._brikk_recognition=recognition
+    if(window.brikk?.haptic)window.brikk.haptic('medium')
+  }
+
+  const stopRecording=async()=>{
+    if(window._brikk_recognition){window._brikk_recognition.onend=null;window._brikk_recognition.stop()}
+    setRecording(false)
+    if(window.brikk?.haptic)window.brikk.haptic('success')
+    if(!transcript.trim())return
+    setVoiceProcessing(true)
+    try{
+      const res=await fetch('/api/copilot',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({mode:'voice_extract',transcript:transcript.trim()})
+      })
+      const data=await res.json()
+      if(data.extraction)setVoiceResult(data.extraction)
+      else setVoiceResult({raw:transcript.trim(),note:'Could not extract structured data — saved as note.'})
+    }catch(err){
+      setVoiceResult({raw:transcript.trim(),note:'AI unavailable — saved as raw note.'})
+    }
+    setVoiceProcessing(false)
+  }
+
+  const saveVoiceNote=async()=>{
+    const {data:{user}}=await supabase.auth.getUser()
+    if(!user)return
+    // If we have a lead match, add as interaction
+    if(voiceResult?.lead_id){
+      await supabase.from('interactions').insert({user_id:user.id,lead_id:voiceResult.lead_id,interaction_type:'voice_note',notes:voiceResult.raw||transcript})
+      await supabase.from('leads').update({last_contact_date:new Date().toISOString(),notes:voiceResult.notes||transcript}).eq('id',voiceResult.lead_id)
+    }else if(voiceResult?.new_lead_name){
+      await supabase.from('leads').insert({user_id:user.id,name:voiceResult.new_lead_name,phone:voiceResult.phone||'',notes:voiceResult.raw||transcript,source:'Voice Note',temperature:'warm',stage:'New Lead',lead_type:voiceResult.lead_type||'Buyer'})
+    }else{
+      // Save as general note interaction
+      await supabase.from('interactions').insert({user_id:user.id,interaction_type:'voice_note',notes:transcript})
+    }
+    setShowVoice(false);setTranscript('');setVoiceResult(null)
+    if(window.brikk?.haptic)window.brikk.haptic('success')
+    loadData()
   }
 
   // Build action items
@@ -346,6 +418,72 @@ export default function AppOverview(){
           <div style={{fontSize:11,color:c.dim,marginTop:4}}>Text your leads</div>
         </a>
       </div>
+
+      {/* Floating voice button */}
+      {!showVoice&&<button onClick={startRecording} style={{position:"fixed",bottom:90,right:20,width:56,height:56,borderRadius:"50%",background:c.text,border:"none",boxShadow:"0 4px 20px rgba(0,0,0,0.2)",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",zIndex:80}}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>}
+
+      {/* Voice recording overlay */}
+      {showVoice&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:20}} onClick={e=>{if(e.target===e.currentTarget&&!recording){setShowVoice(false)}}}>
+        <div className="scale-in" style={{background:c.white,borderRadius:16,padding:"28px 24px",width:"100%",maxWidth:440,maxHeight:"70vh",overflow:"auto",marginBottom:20}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+            <div>
+              <div style={{fontSize:16,fontWeight:700}}>Voice Note</div>
+              <div style={{fontSize:12,color:c.dim}}>{recording?'Listening...':'Review your note'}</div>
+            </div>
+            {!recording&&<button onClick={()=>{setShowVoice(false);setTranscript('');setVoiceResult(null)}} style={{background:"none",border:"none",fontSize:18,color:c.dim,cursor:"pointer"}}>×</button>}
+          </div>
+
+          {/* Recording indicator */}
+          {recording&&<div style={{textAlign:"center",padding:"24px 0"}}>
+            <div className="recording-pulse" style={{width:72,height:72,borderRadius:"50%",background:c.redSoft,border:`3px solid ${c.red}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px"}}>
+              <div style={{width:20,height:20,borderRadius:4,background:c.red}}/>
+            </div>
+            <button onClick={stopRecording} style={{background:c.red,border:"none",borderRadius:8,padding:"12px 32px",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Stop Recording</button>
+          </div>}
+
+          {/* Transcript */}
+          {transcript&&<div style={{background:c.bg,borderRadius:8,padding:"14px 16px",marginBottom:16,border:`1px solid ${c.border}`}}>
+            <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Transcript</div>
+            <div style={{fontSize:13,color:c.text,lineHeight:1.7}}>{transcript}</div>
+          </div>}
+
+          {/* Processing */}
+          {voiceProcessing&&<div style={{textAlign:"center",padding:"16px 0"}}>
+            <div style={{fontSize:13,color:c.dim,animation:"pulse 1.2s ease-in-out infinite"}}>AI is extracting lead info...</div>
+          </div>}
+
+          {/* AI extraction result */}
+          {voiceResult&&!voiceProcessing&&<div style={{marginBottom:16}}>
+            <div style={{background:"rgba(109,40,217,0.04)",border:`1px solid ${c.purpleBorder}`,borderRadius:8,padding:"14px 16px",marginBottom:12}}>
+              <div style={{fontSize:10,fontWeight:600,color:c.purple,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>AI Extracted</div>
+              {voiceResult.new_lead_name&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>New lead: <strong>{voiceResult.new_lead_name}</strong></div>}
+              {voiceResult.lead_name&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Lead: <strong>{voiceResult.lead_name}</strong></div>}
+              {voiceResult.action&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Action: {voiceResult.action}</div>}
+              {voiceResult.price&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Price: {voiceResult.price}</div>}
+              {voiceResult.notes&&<div style={{fontSize:13,color:c.sub,marginTop:6}}>{voiceResult.notes}</div>}
+              {voiceResult.note&&<div style={{fontSize:12,color:c.dim,marginTop:6,fontStyle:"italic"}}>{voiceResult.note}</div>}
+            </div>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={saveVoiceNote} style={{flex:1,background:c.text,border:"none",borderRadius:8,padding:"12px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Save to CRM</button>
+              <button onClick={()=>{setShowVoice(false);setTranscript('');setVoiceResult(null)}} style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:8,padding:"12px 20px",fontSize:13,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>Discard</button>
+            </div>
+          </div>}
+
+          {/* Start recording again */}
+          {!recording&&!voiceProcessing&&!voiceResult&&transcript&&<div style={{display:"flex",gap:8}}>
+            <button onClick={startRecording} style={{flex:1,background:c.text,border:"none",borderRadius:8,padding:"12px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Record Again</button>
+            <button onClick={stopRecording} style={{flex:1,background:c.purpleSoft,border:`1px solid ${c.purpleBorder}`,borderRadius:8,padding:"12px",fontSize:13,fontWeight:600,color:c.purple,cursor:"pointer",fontFamily:"inherit"}}>Process with AI</button>
+          </div>}
+
+          {/* Initial state */}
+          {!recording&&!transcript&&<div style={{textAlign:"center",padding:"16px 0"}}>
+            <button onClick={startRecording} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 32px",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Start Recording</button>
+            <div style={{fontSize:12,color:c.dim,marginTop:8}}>Tap and speak — AI extracts lead info</div>
+          </div>}
+        </div>
+      </div>}
     </div>
   )
 }

@@ -17,7 +17,10 @@ export default function MessagesPage(){
   const [sending,setSending]=useState(false)
   const [searchTerm,setSearchTerm]=useState('')
   const [profile,setProfile]=useState(null)
+  const [toast,setToast]=useState(null)
   const messagesEndRef=useRef(null)
+
+  const showToast=(msg)=>{setToast(msg);setTimeout(()=>setToast(null),3000)}
 
   useEffect(()=>{loadData()},[])
   useEffect(()=>{if(selectedLead)loadMessages(selectedLead.id)},[selectedLead])
@@ -109,6 +112,8 @@ export default function MessagesPage(){
 
     setDraft('')
     setSending(false)
+    showToast('Message sent')
+    if(window.brikk?.haptic)window.brikk.haptic('success')
     loadMessages(selectedLead.id)
     loadData()
   }
@@ -155,13 +160,14 @@ export default function MessagesPage(){
     return null
   }
 
-  if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading messages...</div>
+  if(loading)return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Loading messages...</div><style>{`@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style></div>
 
   // On mobile: show lead list OR conversation, not both
   const showConversation=selectedLead!==null
 
   return(
     <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 130px)"}}>
+      {toast&&<div className="toast" style={{position:"fixed",top:80,right:20,zIndex:200,background:"rgba(22,128,60,0.06)",border:"1px solid rgba(22,128,60,0.15)",borderRadius:8,padding:"12px 20px",fontSize:13,fontWeight:600,color:"#16803C",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{toast}</div>}
       <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div>
           <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>Messages</h1>

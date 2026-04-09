@@ -16,6 +16,9 @@ export default function CopilotPage(){
   const [skippedIds,setSkippedIds]=useState([])
   const [editingId,setEditingId]=useState(null)
   const [editText,setEditText]=useState('')
+  const [toast,setToast]=useState(null)
+
+  const showToast=(msg)=>{setToast(msg);setTimeout(()=>setToast(null),3000)}
   const [profile,setProfile]=useState(null)
   const [stats,setStats]=useState({sent:0,approved:0})
 
@@ -88,6 +91,9 @@ export default function CopilotPage(){
 
     setApprovedIds(p=>[...p,draft.lead_id])
     setStats(p=>({...p,approved:p.approved+1,sent:p.sent+1}))
+    showToast('Draft approved — contact logged')
+    // Native haptic feedback
+    if(window.brikk?.haptic)window.brikk.haptic('success')
   }
 
   const handleSkip=(leadId)=>{
@@ -108,10 +114,11 @@ export default function CopilotPage(){
   const pendingDrafts=drafts.filter(d=>!approvedIds.includes(d.lead_id)&&!skippedIds.includes(d.lead_id))
   const urgencyStyle={high:{bg:c.redSoft,color:c.red,border:c.redBorder},medium:{bg:c.amberSoft,color:c.amber,border:c.amberBorder},low:{bg:c.borderLight,color:c.dim,border:c.border}}
 
-  if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading...</div>
+  if(loading)return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Loading Copilot...</div><style>{`@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style></div>
 
   return(
-    <div>
+    <div className="page-content">
+      {toast&&<div className="toast" style={{position:"fixed",top:80,right:20,zIndex:200,background:"rgba(22,128,60,0.06)",border:"1px solid rgba(22,128,60,0.15)",borderRadius:8,padding:"12px 20px",fontSize:13,fontWeight:600,color:"#16803C",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{toast}</div>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
           <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>AI Copilot</h1>

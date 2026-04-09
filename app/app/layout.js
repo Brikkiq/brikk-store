@@ -28,6 +28,8 @@ export default function AppLayout({children}){
       else{setUser(user);setLoading(false);checkNotifications()}
     })
     if(typeof window!=='undefined')setCurrentPath(window.location.pathname)
+    // Request push notification permission after 15 seconds (Apple rejects immediate requests)
+    setTimeout(()=>{if(window.brikk?.requestPushPermission)window.brikk.requestPushPermission()},15000)
   },[])
 
   const checkNotifications=async()=>{
