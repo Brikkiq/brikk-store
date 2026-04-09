@@ -16,7 +16,11 @@ export default function LeadsPage(){
   const [showForm,setShowForm]=useState(false)
   const [editId,setEditId]=useState(null)
   const [filter,setFilter]=useState("all")
-  const [form,setForm]=useState({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:'',last_contact_date:''})
+  const [saving,setSaving]=useState(false)
+  const [toast,setToast]=useState(null)
+  const [form,setForm]=useState({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:'',last_contact_date:'',address:'',preferred_area:'',bedrooms:'',pre_approved:false,pre_approved_amount:'',timeline:'',birthday:'',contact_preference:'text',spouse_name:''})
+
+  const showToast=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),3000)}
 
   useEffect(()=>{loadLeads()},[])
 
@@ -28,34 +32,42 @@ export default function LeadsPage(){
   const handleSave=async()=>{
     const {data:{user}}=await supabase.auth.getUser()
     if(!user)return
+    setSaving(true)
 
     const saveData={...form}
-    // Use custom date or default to now
     if(!saveData.last_contact_date){
       saveData.last_contact_date=new Date().toISOString()
     }else{
       saveData.last_contact_date=new Date(saveData.last_contact_date).toISOString()
     }
 
-    if(editId){
-      const {last_contact_date,...rest}=saveData
-      await supabase.from('leads').update({...rest,last_contact_date,updated_at:new Date().toISOString()}).eq('id',editId)
-    }else{
-      await supabase.from('leads').insert({...saveData,user_id:user.id})
-    }
-    setForm({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:'',last_contact_date:''})
+    try{
+      if(editId){
+        const {last_contact_date,...rest}=saveData
+        await supabase.from('leads').update({...rest,last_contact_date,updated_at:new Date().toISOString()}).eq('id',editId)
+        showToast('Lead updated')
+      }else{
+        await supabase.from('leads').insert({...saveData,user_id:user.id})
+        showToast('Lead added')
+      }
+    }catch(err){showToast('Something went wrong','error')}
+
+    setSaving(false)
+    setForm({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:'',last_contact_date:'',address:'',preferred_area:'',bedrooms:'',pre_approved:false,pre_approved_amount:'',timeline:'',birthday:'',contact_preference:'text',spouse_name:''})
     setShowForm(false);setEditId(null);loadLeads()
   }
 
   const handleEdit=(lead)=>{
     const lcd=lead.last_contact_date?new Date(lead.last_contact_date).toISOString().split('T')[0]:''
-    setForm({name:lead.name||'',phone:lead.phone||'',email:lead.email||'',source:lead.source||'Zillow',temperature:lead.temperature||'warm',stage:lead.stage||'New Lead',lead_type:lead.lead_type||'Buyer',price_range:lead.price_range||'',notes:lead.notes||'',last_contact_date:lcd})
+    const bday=lead.birthday?new Date(lead.birthday).toISOString().split('T')[0]:''
+    setForm({name:lead.name||'',phone:lead.phone||'',email:lead.email||'',source:lead.source||'Zillow',temperature:lead.temperature||'warm',stage:lead.stage||'New Lead',lead_type:lead.lead_type||'Buyer',price_range:lead.price_range||'',notes:lead.notes||'',last_contact_date:lcd,address:lead.address||'',preferred_area:lead.preferred_area||'',bedrooms:lead.bedrooms||'',pre_approved:lead.pre_approved||false,pre_approved_amount:lead.pre_approved_amount||'',timeline:lead.timeline||'',birthday:bday,contact_preference:lead.contact_preference||'text',spouse_name:lead.spouse_name||''})
     setEditId(lead.id);setShowForm(true)
   }
 
   const handleDelete=async(id)=>{
     if(!confirm('Delete this lead?'))return
     await supabase.from('leads').delete().eq('id',id)
+    showToast('Lead deleted')
     loadLeads()
   }
 
@@ -63,6 +75,7 @@ export default function LeadsPage(){
     await supabase.from('leads').update({last_contact_date:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',id)
     const {data:{user}}=await supabase.auth.getUser()
     if(user){await supabase.from('interactions').insert({user_id:user.id,lead_id:id,interaction_type:'contact',notes:'Logged contact'})}
+    showToast('Contact logged')
     loadLeads()
   }
 
@@ -74,16 +87,18 @@ export default function LeadsPage(){
   const filtered=filter==='all'?leads:leads.filter(l=>l.temperature===filter)
   const tempColor=(t)=>({hot:{bg:c.redSoft,color:c.red},warm:{bg:c.amberSoft,color:c.amber},cold:{bg:"rgba(26,26,24,0.04)",color:c.dim}}[t]||{bg:c.bg,color:c.dim})
 
-  if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading leads...</div>
+  if(loading)return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Loading leads...</div><style>{`@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style></div>
 
   return(
     <div>
+      {/* Toast */}
+      {toast&&<div style={{position:"fixed",top:80,right:20,zIndex:200,background:toast.type==='error'?c.redSoft:c.greenSoft,border:`1px solid ${toast.type==='error'?'rgba(190,18,60,0.15)':c.greenBorder}`,borderRadius:8,padding:"12px 20px",fontSize:13,fontWeight:600,color:toast.type==='error'?c.red:c.green,animation:"slideUp 0.3s ease-out",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{toast.msg}</div>}
       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
         <div>
           <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>Leads</h1>
           <p style={{fontSize:13,color:c.sub,margin:0}}>{leads.length} total leads</p>
         </div>
-        <button onClick={()=>{setShowForm(true);setEditId(null);setForm({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:''})}}
+        <button onClick={()=>{setShowForm(true);setEditId(null);setForm({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:'',last_contact_date:'',address:'',preferred_area:'',bedrooms:'',pre_approved:false,pre_approved_amount:'',timeline:'',birthday:'',contact_preference:'text',spouse_name:''})}}
           style={{background:c.text,border:"none",borderRadius:8,padding:"10px 22px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>
           Add Lead
         </button>
@@ -158,6 +173,65 @@ export default function LeadsPage(){
               style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,fontFamily:"inherit",boxSizing:"border-box"}}/>
             <div style={{fontSize:10,color:c.dim,marginTop:3}}>Leave blank for today</div>
           </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Current Address</label>
+            <input value={form.address} onChange={e=>setForm({...form,address:e.target.value})} placeholder="123 Main St, City"
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Preferred Area</label>
+            <input value={form.preferred_area} onChange={e=>setForm({...form,preferred_area:e.target.value})} placeholder="Downtown, Westside, etc."
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Bedrooms</label>
+            <select value={form.bedrooms} onChange={e=>setForm({...form,bedrooms:e.target.value})}
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,fontFamily:"inherit",boxSizing:"border-box"}}>
+              <option value="">Any</option>
+              {["1","2","3","4","5+"].map(b=><option key={b} value={b}>{b}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Pre-Approved?</label>
+            <div style={{display:"flex",gap:6}}>
+              {[{l:"No",v:false},{l:"Yes",v:true}].map(o=>(
+                <button key={o.l} type="button" onClick={()=>setForm({...form,pre_approved:o.v})}
+                  style={{flex:1,padding:"10px",borderRadius:6,border:`1px solid ${form.pre_approved===o.v?c.text:c.border}`,background:form.pre_approved===o.v?c.text:"transparent",color:form.pre_approved===o.v?"#fff":c.sub,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{o.l}</button>
+              ))}
+            </div>
+          </div>
+          {form.pre_approved&&<div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Pre-Approval Amount</label>
+            <input value={form.pre_approved_amount} onChange={e=>setForm({...form,pre_approved_amount:e.target.value})} placeholder="$350,000"
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          </div>}
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Timeline</label>
+            <select value={form.timeline} onChange={e=>setForm({...form,timeline:e.target.value})}
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,fontFamily:"inherit",boxSizing:"border-box"}}>
+              <option value="">Not specified</option>
+              {["ASAP","1-3 months","3-6 months","6-12 months","Just browsing"].map(t=><option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Contact Preference</label>
+            <div style={{display:"flex",gap:4}}>
+              {["text","call","email"].map(p=>(
+                <button key={p} type="button" onClick={()=>setForm({...form,contact_preference:p})}
+                  style={{flex:1,padding:"10px",borderRadius:6,border:`1px solid ${form.contact_preference===p?c.text:c.border}`,background:form.contact_preference===p?c.text:"transparent",color:form.contact_preference===p?"#fff":c.sub,fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",textTransform:"capitalize"}}>{p}</button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Birthday</label>
+            <input type="date" value={form.birthday} onChange={e=>setForm({...form,birthday:e.target.value})}
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,fontFamily:"inherit",boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Spouse / Partner</label>
+            <input value={form.spouse_name} onChange={e=>setForm({...form,spouse_name:e.target.value})} placeholder="Partner's name"
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          </div>
         </div>
         <div style={{marginBottom:16}}>
           <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Notes</label>
@@ -165,9 +239,9 @@ export default function LeadsPage(){
             style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/>
         </div>
         <div style={{display:"flex",gap:8}}>
-          <button onClick={handleSave} disabled={!form.name}
-            style={{background:c.text,border:"none",borderRadius:6,padding:"10px 24px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:form.name?1:0.5}}>
-            {editId?'Update Lead':'Add Lead'}
+          <button onClick={handleSave} disabled={!form.name||saving}
+            style={{background:c.text,border:"none",borderRadius:6,padding:"10px 24px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:form.name&&!saving?1:0.5}}>
+            {saving?'Saving...':editId?'Update Lead':'Add Lead'}
           </button>
           <button onClick={()=>{setShowForm(false);setEditId(null)}}
             style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:6,padding:"10px 24px",fontSize:13,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>
@@ -193,8 +267,10 @@ export default function LeadsPage(){
                 <div style={{width:36,height:36,borderRadius:8,background:tc.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:tc.color,flexShrink:0}}>{l.name?.split(' ').map(n=>n[0]).join('').slice(0,2)}</div>
                 <div>
                   <div style={{fontSize:14,fontWeight:600}}>{l.name}</div>
-                  <div style={{fontSize:11,color:c.dim}}>{l.lead_type} / {l.source} / {l.stage}{l.price_range?` / ${l.price_range}`:''}</div>
+                  <div style={{fontSize:11,color:c.dim}}>{l.lead_type} / {l.source} / {l.stage}{l.price_range?` / ${l.price_range}`:''}{l.timeline?` / ${l.timeline}`:''}</div>
                   {l.phone&&<div style={{fontSize:11,color:c.sub,marginTop:2}}>{l.phone}{l.email?` / ${l.email}`:''}</div>}
+                  {(l.preferred_area||l.bedrooms||l.pre_approved)&&<div style={{fontSize:11,color:c.sub,marginTop:2}}>{l.preferred_area?`Area: ${l.preferred_area}`:''}{l.bedrooms?` / ${l.bedrooms}br`:''}{l.pre_approved?` / Pre-approved${l.pre_approved_amount?' '+l.pre_approved_amount:''}`:''}</div>}
+                  {l.contact_preference&&l.contact_preference!=='text'&&<div style={{fontSize:10,color:c.dim,marginTop:2}}>Prefers: {l.contact_preference}</div>}
                 </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>

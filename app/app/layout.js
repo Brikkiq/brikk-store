@@ -90,7 +90,9 @@ export default function AppLayout({children}){
   if(loading)return(
     <div style={{background:c.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Instrument Sans',sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-      <div style={{fontSize:14,color:c.dim}}>Loading...</div>
+      <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+      <style>{`@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style>
+      <div style={{fontSize:18,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Brikk</div>
     </div>
   )
 
@@ -100,6 +102,11 @@ export default function AppLayout({children}){
       <style>{`
         @media(min-width:769px){.mobile-bottom-nav{display:none!important}.desktop-nav{display:flex!important}}
         @media(max-width:768px){.desktop-nav{display:none!important}.mobile-bottom-nav{display:flex!important}.app-main{padding:16px 16px 80px!important}}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
+        .fade-in{animation:fadeIn 0.3s ease-out}
+        .slide-up{animation:slideUp 0.3s ease-out}
       `}</style>
 
       {/* Notification banner */}
