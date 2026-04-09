@@ -161,20 +161,20 @@ export default function Home(){
       <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 
       {/* Nav */}
-      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 32px",maxWidth:1120,margin:"0 auto"}}>
+      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px",maxWidth:1120,margin:"0 auto"}}>
         <span style={{fontSize:18,fontWeight:700,letterSpacing:"-0.02em"}}>Brikk</span>
-        <div style={{display:"flex",alignItems:"center",gap:24}}>
-          <a href="#features" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
-          <a href="#how" style={{fontSize:13,fontWeight:500,color:c.sub}}>How It Works</a>
-          <a href="#pricing" style={{fontSize:13,fontWeight:500,color:c.sub}}>Pricing</a>
+        <div style={{display:"flex",alignItems:"center",gap:20}}>
+          <a href="#features" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
+          <a href="#how" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>How It Works</a>
+          <a href="#pricing" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Pricing</a>
           <a href="/login" style={{fontSize:13,fontWeight:600,color:c.bg,background:c.text,padding:"8px 20px",borderRadius:6}}>Start Free</a>
         </div>
       </nav>
 
       {/* Hero */}
-      <section style={{padding:"80px 32px 60px",maxWidth:1120,margin:"0 auto"}}>
+      <section className="mobile-pad-hero" style={{padding:"80px 32px 60px",maxWidth:1120,margin:"0 auto"}}>
         <div style={{display:"flex",gap:48,alignItems:"center",flexWrap:"wrap"}}>
-          <div style={{flex:"1 1 380px",maxWidth:460}}>
+          <div style={{flex:"1 1 320px",maxWidth:460}}>
             <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
               <span style={{fontSize:12,fontWeight:600,color:c.green}}>First 2 months free — no credit card</span>
             </div>
@@ -189,7 +189,7 @@ export default function Home(){
             </p>
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               {!submitted?<>
-                <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:240,outline:"none",fontFamily:"inherit"}}/>
+                <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:"100%",maxWidth:240,minWidth:180,outline:"none",fontFamily:"inherit",flex:"1 1 180px"}}/>
                 <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 2 Months Free</button>
               </>:<div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"14px 28px",fontSize:14,color:c.green,fontWeight:600}}>You're in. Check your email.</div>}
             </div>
@@ -199,21 +199,21 @@ export default function Home(){
       </section>
 
       {/* Stats */}
-      <div style={{borderTop:`1px solid ${c.border}`,borderBottom:`1px solid ${c.border}`,padding:"32px 0"}}>
-        <div style={{maxWidth:1120,margin:"0 auto",padding:"0 32px",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:24}}>
-          {[["78%","of buyers pick the first agent who responds"],["15 hrs","average agent response time"],["80%","of sales happen after the 5th follow-up"],["$75/mo","vs $300-500 for competing platforms"]].map(([val,desc],i)=>(
-            <div key={i} style={{textAlign:"center",flex:"1 1 200px"}}><div style={{fontSize:24,fontWeight:700}}>{val}</div><div style={{fontSize:12,color:c.dim,marginTop:4}}>{desc}</div></div>
+      <div style={{borderTop:`1px solid ${c.border}`,borderBottom:`1px solid ${c.border}`,padding:"24px 0"}}>
+        <div style={{maxWidth:1120,margin:"0 auto",padding:"0 20px",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
+          {[["78%","of buyers pick the first agent who responds"],["15 hrs","average agent response time"],["80%","of sales happen after the 5th follow-up"],["$75/mo","vs $300-500 for competitors"]].map(([val,desc],i)=>(
+            <div key={i} style={{textAlign:"center",flex:"1 1 140px"}}><div style={{fontSize:22,fontWeight:700}}>{val}</div><div style={{fontSize:11,color:c.dim,marginTop:4}}>{desc}</div></div>
           ))}
         </div>
       </div>
 
       {/* Problem/Solution */}
-      <section style={{padding:"80px 32px",maxWidth:1120,margin:"0 auto"}}>
+      <section style={{padding:"60px 20px",maxWidth:1120,margin:"0 auto"}}>
         <div style={{maxWidth:680,margin:"0 auto",textAlign:"center",marginBottom:48}}>
           <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 16px"}}>You're losing deals to your own workflow.</h2>
           <p style={{fontSize:15,color:c.sub,lineHeight:1.8,margin:0}}>Zillow. CRM. Google Sheets. Calendar. Email. Phone. Notes app. By the time you've checked everything, the hot lead from Tuesday went with another agent.</p>
         </div>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:20,maxWidth:800,margin:"0 auto"}}>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,maxWidth:800,margin:"0 auto"}}>
           <div style={{background:c.redSoft,border:`1px solid rgba(190,18,60,0.1)`,borderRadius:10,padding:"28px 24px"}}>
             <div style={{fontSize:14,fontWeight:700,color:c.red,marginBottom:12}}>Without Brikk</div>
             {["Check 8 different apps every morning","Leads go cold because you forgot","No idea which marketing channels work","Follow-ups depend on your memory","Clients call 5x a day for deal updates"].map((item,i)=>(
@@ -236,7 +236,7 @@ export default function Home(){
       </section>
 
       {/* How it works */}
-      <section id="how" style={{padding:"80px 32px",borderTop:`1px solid ${c.border}`,background:c.white}}>
+      <section id="how" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,background:c.white}}>
         <div style={{maxWidth:1120,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:48}}>
             <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:0}}>Set up in 5 minutes. Not 5 hours.</h2>
@@ -258,7 +258,7 @@ export default function Home(){
       </section>
 
       {/* Features — only what's real */}
-      <section id="features" style={{padding:"80px 32px",borderTop:`1px solid ${c.border}`}}>
+      <section id="features" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`}}>
         <div style={{maxWidth:1120,margin:"0 auto"}}>
           <div style={{marginBottom:48}}>
             <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>What you get today.</h2>
@@ -285,7 +285,7 @@ export default function Home(){
       </section>
 
       {/* Moat */}
-      <section style={{padding:"64px 32px",borderTop:`1px solid ${c.border}`,textAlign:"center",background:c.white}}>
+      <section style={{padding:"48px 20px",borderTop:`1px solid ${c.border}`,textAlign:"center",background:c.white}}>
         <div style={{maxWidth:640,margin:"0 auto"}}>
           <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 16px"}}>The longer you use it, the smarter it gets.</h2>
           <p style={{fontSize:15,color:c.sub,lineHeight:1.8,margin:0}}>After 90 days, Brikk knows your conversion patterns, your message style, your best lead sources, and your client relationships. That intelligence compounds monthly — and it doesn't transfer to a competitor.</p>
@@ -293,7 +293,7 @@ export default function Home(){
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={{padding:"80px 32px",borderTop:`1px solid ${c.border}`}}>
+      <section id="pricing" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`}}>
         <div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
           <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>Simple pricing. No surprises.</h2>
           <p style={{fontSize:15,color:c.sub,marginBottom:32}}>Start free. Cancel anytime. No contracts.</p>
@@ -341,7 +341,7 @@ export default function Home(){
       </section>
 
       {/* FAQ */}
-      <section style={{padding:"80px 32px",borderTop:`1px solid ${c.border}`,background:c.white}}>
+      <section style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,background:c.white}}>
         <div style={{maxWidth:680,margin:"0 auto"}}>
           <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 32px"}}>Common questions</h2>
           {faqs.map((f,i)=>(
@@ -357,7 +357,7 @@ export default function Home(){
       </section>
 
       {/* CTA */}
-      <section style={{padding:"80px 32px",textAlign:"center",borderTop:`1px solid ${c.border}`}}>
+      <section style={{padding:"60px 20px",textAlign:"center",borderTop:`1px solid ${c.border}`}}>
         <div style={{maxWidth:520,margin:"0 auto"}}>
           <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
             <span style={{fontSize:12,fontWeight:600,color:c.green}}>Limited — first 2 months free</span>
@@ -366,7 +366,7 @@ export default function Home(){
           <p style={{fontSize:15,color:c.sub,marginBottom:28}}>60 days free. No credit card. Everything included.</p>
           <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
             {!submitted?<>
-              <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:240,outline:"none",fontFamily:"inherit"}}/>
+              <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:"100%",maxWidth:240,minWidth:180,outline:"none",fontFamily:"inherit",flex:"1 1 180px"}}/>
               <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 2 Months Free</button>
             </>:<div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"14px 28px",fontSize:14,color:c.green,fontWeight:600}}>You're in. Check your email.</div>}
           </div>
@@ -374,7 +374,7 @@ export default function Home(){
       </section>
 
       {/* Footer */}
-      <footer style={{borderTop:`1px solid ${c.border}`,padding:"28px 32px",display:"flex",justifyContent:"space-between",alignItems:"center",maxWidth:1120,margin:"0 auto",flexWrap:"wrap",gap:8}}>
+      <footer style={{borderTop:`1px solid ${c.border}`,padding:"24px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",maxWidth:1120,margin:"0 auto",flexWrap:"wrap",gap:8}}>
         <span style={{fontSize:14,fontWeight:700}}>Brikk</span>
         <div style={{display:"flex",gap:20}}>
           <a href="/login" style={{fontSize:12,color:c.sub}}>Sign In</a>

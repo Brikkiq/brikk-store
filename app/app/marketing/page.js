@@ -124,20 +124,20 @@ export default function MarketingPage(){
         </div>
 
         {/* Source breakdown table */}
-        <div style={{flex:"1 1 400px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px"}}>
+        <div style={{flex:"1 1 400px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",overflowX:"auto"}}>
           <div style={{fontSize:11,fontWeight:600,color:c.dim,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:14}}>Source Performance</div>
           {sourceData.length===0?(
             <div style={{padding:"30px 0",textAlign:"center",color:c.dim,fontSize:13}}>No data yet</div>
-          ):<>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 50px 50px 50px 60px",gap:8,padding:"0 0 8px",borderBottom:`1px solid ${c.border}`}}>
-              {["Source","Leads","Hot","Warm","Hot %"].map((h,i)=>(
-                <span key={i} style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em"}}>{h}</span>
+          ):<div style={{minWidth:320}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 44px 44px 44px 52px",gap:6,padding:"0 0 8px",borderBottom:`1px solid ${c.border}`}}>
+              {["Source","Leads","Hot","Warm","Hot%"].map((h,i)=>(
+                <span key={i} style={{fontSize:9,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em"}}>{h}</span>
               ))}
             </div>
             {sourceData.map((s,i)=>{
               const hotPct=s.leads>0?((s.hot/s.leads)*100).toFixed(0):0
               return(
-                <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 50px 50px 50px 60px",gap:8,padding:"10px 0",borderBottom:`1px solid ${c.borderLight}`}}>
+                <div key={i} style={{display:"grid",gridTemplateColumns:"1fr 44px 44px 44px 52px",gap:6,padding:"10px 0",borderBottom:`1px solid ${c.borderLight}`}}>
                   <div style={{display:"flex",alignItems:"center",gap:6}}>
                     <div style={{width:6,height:6,borderRadius:2,background:sourceColors[s.name]||c.dim}}/>
                     <span style={{fontSize:12,color:c.text}}>{s.name}</span>
@@ -149,7 +149,7 @@ export default function MarketingPage(){
                 </div>
               )
             })}
-          </>}
+          </div>}
         </div>
       </div>
 

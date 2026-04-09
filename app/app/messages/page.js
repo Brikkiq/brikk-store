@@ -157,16 +157,22 @@ export default function MessagesPage(){
 
   if(loading)return <div style={{padding:40,textAlign:"center",color:c.dim}}>Loading messages...</div>
 
+  // On mobile: show lead list OR conversation, not both
+  const showConversation=selectedLead!==null
+
   return(
-    <div style={{height:"calc(100vh - 130px)",display:"flex",flexDirection:"column"}}>
-      <div style={{marginBottom:16}}>
-        <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>Messages</h1>
-        <p style={{fontSize:13,color:c.sub,margin:0}}>Message your leads — AI drafts included</p>
+    <div style={{display:"flex",flexDirection:"column",height:"calc(100vh - 130px)"}}>
+      <div style={{marginBottom:16,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div>
+          <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>Messages</h1>
+          <p style={{fontSize:13,color:c.sub,margin:0}}>Message your leads — AI drafts included</p>
+        </div>
+        {showConversation&&<button onClick={()=>setSelectedLead(null)} className="show-mobile" style={{display:"none",background:c.bg,border:`1px solid ${c.border}`,borderRadius:6,padding:"6px 14px",fontSize:12,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>Back</button>}
       </div>
 
-      <div style={{flex:1,display:"flex",gap:14,minHeight:0,flexWrap:"wrap"}}>
-        {/* Lead list sidebar */}
-        <div style={{flex:"0 0 280px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:240}}>
+      <div style={{flex:1,display:"flex",gap:14,minHeight:0}}>
+        {/* Lead list sidebar — hidden on mobile when conversation is open */}
+        <div className={showConversation?"hide-mobile":""} style={{flex:"0 0 280px",background:c.white,border:`1px solid ${c.border}`,borderRadius:8,display:"flex",flexDirection:"column",overflow:"hidden",maxWidth:"100%"}}>
           {/* Search */}
           <div style={{padding:"12px",borderBottom:`1px solid ${c.border}`}}>
             <input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Search leads..."
@@ -202,7 +208,7 @@ export default function MessagesPage(){
         </div>
 
         {/* Conversation area */}
-        <div style={{flex:1,display:"flex",flexDirection:"column",minWidth:300}}>
+        <div className={!showConversation?"hide-mobile":""} style={{flex:1,display:"flex",flexDirection:"column",minWidth:0}}>
           {!selectedLead?(
             <div style={{flex:1,background:c.white,border:`1px solid ${c.border}`,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center"}}>
               <div style={{textAlign:"center",padding:20}}>
