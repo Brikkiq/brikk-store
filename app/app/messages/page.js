@@ -53,14 +53,40 @@ export default function MessagesPage(){
     const {data:{user}}=await supabase.auth.getUser()
     if(!user){setSending(false);return}
 
-    // Save message
+    let smsStatus='logged'
+    let smsError=null
+
+    // Send real SMS if lead has a phone number
+    if(selectedLead.phone){
+      try{
+        const smsRes=await fetch('/api/sms',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({to:selectedLead.phone,message:draft.trim(),leadName:selectedLead.name})
+        })
+        const smsData=await smsRes.json()
+        if(smsData.success){
+          smsStatus='sent'
+        }else{
+          smsStatus='failed'
+          smsError=smsData.error
+          console.error('SMS error:',smsData.error)
+        }
+      }catch(err){
+        smsStatus='failed'
+        smsError=err.message
+        console.error('SMS send failed:',err)
+      }
+    }
+
+    // Save message to database
     await supabase.from('messages').insert({
       user_id:user.id,
       lead_id:selectedLead.id,
       direction:'outbound',
       channel:'text',
       content:draft.trim(),
-      status:'sent'
+      status:smsStatus
     })
 
     // Update lead last contact
@@ -74,8 +100,12 @@ export default function MessagesPage(){
       user_id:user.id,
       lead_id:selectedLead.id,
       interaction_type:'text',
-      notes:draft.trim()
+      notes:`${smsStatus==='sent'?'SMS sent':'Message logged'}: ${draft.trim()}`
     })
+
+    if(smsError){
+      alert(`Message saved but SMS delivery failed: ${smsError}. Make sure the phone number is correct.`)
+    }
 
     setDraft('')
     setSending(false)
@@ -212,7 +242,7 @@ export default function MessagesPage(){
                       <div style={{fontSize:13,lineHeight:1.6}}>{m.content}</div>
                       <div style={{fontSize:10,color:m.direction==='outbound'?"rgba(255,255,255,0.5)":c.dim,marginTop:4,display:"flex",justifyContent:"space-between",gap:12}}>
                         <span>{formatTime(m.created_at)}</span>
-                        {m.status&&<span>{m.status==='sent'?'Sent':m.status==='draft'?'Draft':m.status}</span>}
+                        {m.status&&<span style={{color:m.status==='failed'?'#EF4444':undefined}}>{m.status==='sent'?'✓ Sent via SMS':m.status==='received'?'Received':m.status==='failed'?'Failed':m.status==='logged'?'Logged (no phone)':m.status}</span>}
                       </div>
                     </div>
                   </div>
@@ -244,7 +274,7 @@ export default function MessagesPage(){
                     {sending?'...':'Send'}
                   </button>
                 </div>
-                <div style={{fontSize:10,color:c.dim,marginTop:6}}>Press Enter to send. Shift+Enter for new line. Messages are logged to this lead's history.</div>
+                <div style={{fontSize:10,color:c.dim,marginTop:6}}>Press Enter to send{selectedLead.phone?' as real SMS to '+selectedLead.phone:''}. Shift+Enter for new line.</div>
               </div>
             </>
           )}
