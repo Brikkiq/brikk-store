@@ -150,7 +150,7 @@ export default function Home(){
     {q:"How does AI Copilot work?",a:"Copilot reads each lead's full context — their temperature, how long since you've been in touch, their stage, their notes — and drafts a personalized message. You tap approve, edit, or skip. That's it."},
     {q:"Can I actually text leads from the app?",a:"Yes. Brikk has a built-in messaging system. You can draft messages manually or let AI write them, then send directly to your lead's phone number. SMS delivery is included."},
     {q:"Does it work on my phone?",a:"Yes. Brikk is a Progressive Web App. Add it to your home screen on iPhone or Android and it works like a native app with a bottom tab bar. No app store needed."},
-    {q:"Is the first 2 months really free?",a:"Yes. No credit card to start. Full access to every feature for 60 days. If it doesn't help you close more deals, you owe nothing."},
+    {q:"Is the first 2 months really free?",a:"Yes. No credit card to start. Full access to every feature for 45 days. If it doesn't help you close more deals, you owe nothing."},
     {q:"How is this different from Lofty or Follow Up Boss?",a:"Those platforms cost $300-500/month, require hours of training, and are built for large brokerages. Brikk is $75/month, takes 5 minutes to set up, and is built for solo agents and small teams who want AI that actually does things — not just stores data."},
     {q:"What about my existing leads?",a:"Add them manually in about 2 minutes each, or share your referral link and new leads flow in automatically. We're building CSV import for the next update."},
     {q:"Does the AI learn over time?",a:"The more you use Brikk, the more context AI has about your leads, your deals, and your patterns. After 90 days, it knows your business better than any CRM you've ever used."},
@@ -176,7 +176,7 @@ export default function Home(){
         <div style={{display:"flex",gap:48,alignItems:"center",flexWrap:"wrap"}}>
           <div style={{flex:"1 1 320px",maxWidth:460}}>
             <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
-              <span style={{fontSize:12,fontWeight:600,color:c.green}}>First 2 months free — no credit card</span>
+              <span style={{fontSize:12,fontWeight:600,color:c.green}}>First 45 days free — no credit card</span>
             </div>
             <h1 style={{fontSize:"clamp(34px,5vw,50px)",fontWeight:700,letterSpacing:"-0.03em",lineHeight:1.08,margin:"0 0 20px"}}>
               One screen.<br/>Every lead.<br/>AI that acts.
@@ -185,12 +185,12 @@ export default function Home(){
               Brikk is the command center for real estate agents who are tired of juggling 8 apps and losing leads. Add your leads, and AI handles the follow-ups you keep forgetting.
             </p>
             <p style={{fontSize:14,fontWeight:600,color:c.text,margin:"0 0 28px"}}>
-              $75/month. Not $300. Not $500. And the first 60 days are free.
+              $75/month. Not $300. Not $500. And the first 45 days are free.
             </p>
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               {!submitted?<>
                 <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:"100%",maxWidth:240,minWidth:180,outline:"none",fontFamily:"inherit",flex:"1 1 180px"}}/>
-                <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 2 Months Free</button>
+                <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 45 Days Free</button>
               </>:<div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"14px 28px",fontSize:14,color:c.green,fontWeight:600}}>You're in. Check your email.</div>}
             </div>
           </div>
@@ -301,14 +301,14 @@ export default function Home(){
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
             {/* Pro */}
             <div style={{background:c.white,border:`2px solid ${c.text}`,borderRadius:12,padding:"32px 28px",position:"relative"}}>
-              <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:c.green,color:"#fff",fontSize:11,fontWeight:600,padding:"5px 18px",borderRadius:20}}>First 2 months free</div>
+              <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:c.green,color:"#fff",fontSize:11,fontWeight:600,padding:"5px 18px",borderRadius:20}}>First 45 days free</div>
               <div style={{fontSize:15,fontWeight:700,marginTop:8,marginBottom:4}}>Pro</div>
               <div style={{fontSize:13,color:c.sub,marginBottom:16}}>For solo agents</div>
               <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:2}}>
                 <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$75</span>
                 <span style={{fontSize:14,color:c.sub}}>/month</span>
               </div>
-              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 60 days</div>
+              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 45 days</div>
               <div style={{fontSize:12,color:c.dim,marginBottom:20}}>+ $125 one-time setup fee</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
                 {["Everything in the app","AI Copilot","SMS Messaging","Smart Calendar","Marketing ROI","Lead Capture Link","Mobile App","Unlimited leads & deals"].map((f,i)=>(
@@ -326,7 +326,7 @@ export default function Home(){
                 <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$200</span>
                 <span style={{fontSize:14,color:c.sub}}>/month</span>
               </div>
-              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 60 days</div>
+              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 45 days</div>
               <div style={{fontSize:12,color:c.dim,marginBottom:20}}>+ $125 one-time setup fee</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
                 {["Everything in Pro","Up to 5 agent seats","Broker dashboard","Team performance metrics","Lead routing","Priority support"].map((f,i)=>(
@@ -360,14 +360,14 @@ export default function Home(){
       <section style={{padding:"60px 20px",textAlign:"center",borderTop:`1px solid ${c.border}`}}>
         <div style={{maxWidth:520,margin:"0 auto"}}>
           <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
-            <span style={{fontSize:12,fontWeight:600,color:c.green}}>Limited — first 2 months free</span>
+            <span style={{fontSize:12,fontWeight:600,color:c.green}}>Limited — first 45 days free</span>
           </div>
           <h2 style={{fontSize:32,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 12px"}}>Your leads are waiting.</h2>
-          <p style={{fontSize:15,color:c.sub,marginBottom:28}}>60 days free. No credit card. Everything included.</p>
+          <p style={{fontSize:15,color:c.sub,marginBottom:28}}>45 days free. No credit card. Everything included.</p>
           <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
             {!submitted?<>
               <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:"100%",maxWidth:240,minWidth:180,outline:"none",fontFamily:"inherit",flex:"1 1 180px"}}/>
-              <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 2 Months Free</button>
+              <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 45 Days Free</button>
             </>:<div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"14px 28px",fontSize:14,color:c.green,fontWeight:600}}>You're in. Check your email.</div>}
           </div>
         </div>

@@ -22,7 +22,7 @@ export default function Terms(){
           <p>You must provide accurate information when creating your account. You are responsible for maintaining the security of your account credentials. You must be at least 18 years old to use Brikk.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>4. Pricing and Payment</h2>
-          <p>Brikk offers a 60-day free trial. After the trial period, the Pro plan is $75 per month and the Team plan is $200 per month. A one-time setup fee of $125 applies. Prices may change with 30 days notice. All fees are non-refundable except as required by law.</p>
+          <p>Brikk offers a 45-day free trial. After the trial period, the Pro plan is $75 per month and the Team plan is $200 per month. A one-time setup fee of $125 applies. Prices may change with 30 days notice. All fees are non-refundable except as required by law.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>5. Acceptable Use</h2>
           <p>You agree not to use Brikk to:</p>

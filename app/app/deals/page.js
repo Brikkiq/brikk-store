@@ -28,7 +28,9 @@ export default function DealsPage(){
   useEffect(()=>{loadDeals()},[])
 
   const loadDeals=async()=>{
-    const {data}=await supabase.from('deals').select('*').order('created_at',{ascending:false})
+    const {data:{user}}=await supabase.auth.getUser()
+    if(!user)return
+    const {data}=await supabase.from('deals').select('*').eq('user_id',user.id).order('created_at',{ascending:false})
     setDeals(data||[]);setLoading(false)
   }
 

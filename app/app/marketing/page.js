@@ -16,9 +16,11 @@ export default function MarketingPage(){
   useEffect(()=>{loadData()},[])
 
   const loadData=async()=>{
+    const {data:{user}}=await supabase.auth.getUser()
+    if(!user){setLoading(false);return}
     const [leadsRes,dealsRes]=await Promise.all([
-      supabase.from('leads').select('*'),
-      supabase.from('deals').select('*')
+      supabase.from('leads').select('*').eq('user_id',user.id),
+      supabase.from('deals').select('*').eq('user_id',user.id)
     ])
     setLeads(leadsRes.data||[])
     setDeals(dealsRes.data||[])

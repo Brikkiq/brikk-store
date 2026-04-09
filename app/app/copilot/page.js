@@ -57,11 +57,18 @@ export default function CopilotPage(){
       setDrafts([]);setGenerating(false);return
     }
 
+    // Fetch message history for each lead
+    const leadsWithHistory=await Promise.all(needsFollowUp.map(async(lead)=>{
+      const {data:msgs}=await supabase.from('messages').select('direction,content,created_at').eq('lead_id',lead.id).order('created_at',{ascending:false}).limit(5)
+      const {data:interactions}=await supabase.from('interactions').select('interaction_type,notes,created_at').eq('lead_id',lead.id).order('created_at',{ascending:false}).limit(5)
+      return{...lead,recent_messages:msgs||[],recent_interactions:interactions||[]}
+    }))
+
     try{
       const res=await fetch('/api/copilot',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({leads:needsFollowUp,agentName:profile?.full_name||'Alex'})
+        body:JSON.stringify({leads:leadsWithHistory,agentName:profile?.full_name||'Alex'})
       })
       const data=await res.json()
       setDrafts(data.drafts||[])

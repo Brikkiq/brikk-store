@@ -65,9 +65,32 @@ Return ONLY the JSON, no other text.`
 
     for (const lead of leads.slice(0, 5)) {
       const daysSinceContact = lead.days_since_contact || 0
+      
+      // Build conversation history context
+      let historyContext = ''
+      if (lead.recent_messages && lead.recent_messages.length > 0) {
+        historyContext = '\n\nPrevious messages (most recent first):\n' + lead.recent_messages.map(m => {
+          const dir = m.direction === 'outbound' ? 'You sent' : 'They replied'
+          const date = new Date(m.created_at).toLocaleDateString()
+          return `- ${dir} (${date}): "${m.content}"`
+        }).join('\n')
+      }
+      
+      let interactionContext = ''
+      if (lead.recent_interactions && lead.recent_interactions.length > 0) {
+        interactionContext = '\n\nRecent interactions:\n' + lead.recent_interactions.map(i => {
+          const date = new Date(i.created_at).toLocaleDateString()
+          return `- ${i.interaction_type} (${date}): ${i.notes || 'No notes'}`
+        }).join('\n')
+      }
+
+      const hasHistory = (lead.recent_messages && lead.recent_messages.length > 0) || (lead.recent_interactions && lead.recent_interactions.length > 0)
+
       const prompt = `You are an AI assistant for a real estate agent named ${agentName || 'Alex'}. 
 
 Write a short, personalized follow-up message for this lead. The message should be sent as a text message. Keep it under 40 words. Be warm and professional. Do NOT use phrases like "just checking in" or "just following up." Make it specific and actionable.
+
+${hasHistory ? 'CRITICAL: This is NOT a first contact. Read the conversation history below carefully. Your message MUST continue the existing conversation naturally. Do NOT repeat anything already said. Do NOT re-introduce yourself. Escalate the relationship — offer new value, create urgency, or move toward next steps.' : 'This is likely a first contact or there is no message history. Introduce yourself briefly and offer specific value.'}
 
 Lead info:
 - Name: ${lead.name}
@@ -78,9 +101,14 @@ Lead info:
 - Price Range: ${lead.price_range || 'Not specified'}
 - Days Since Contact: ${daysSinceContact}
 - Notes: ${lead.notes || 'None'}
+- Preferred Area: ${lead.preferred_area || 'Not specified'}
+- Bedrooms: ${lead.bedrooms || 'Not specified'}
+- Pre-approved: ${lead.pre_approved ? 'Yes' + (lead.pre_approved_amount ? ' at ' + lead.pre_approved_amount : '') : 'Unknown'}
+- Timeline: ${lead.timeline || 'Not specified'}
+- Contact Preference: ${lead.contact_preference || 'text'}${historyContext}${interactionContext}
 
 Respond with ONLY a JSON object, nothing else. No markdown, no code blocks. Just the raw JSON:
-{"message": "your draft message here", "reason": "one sentence explaining why to send this now"}`
+{"message": "your draft message here", "reason": "one sentence explaining why to send this now and how it builds on previous contact"}`
 
       try {
         const response = await fetch('https://api.anthropic.com/v1/messages', {

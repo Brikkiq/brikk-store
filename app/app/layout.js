@@ -25,17 +25,17 @@ export default function AppLayout({children}){
   useEffect(()=>{
     supabase.auth.getUser().then(({data:{user}})=>{
       if(!user){window.location.href='/login'}
-      else{setUser(user);setLoading(false);checkNotifications()}
+      else{setUser(user);setLoading(false);checkNotifications(user.id)}
     })
     if(typeof window!=='undefined')setCurrentPath(window.location.pathname)
     // Request push notification permission after 15 seconds (Apple rejects immediate requests)
     setTimeout(()=>{if(window.brikk?.requestPushPermission)window.brikk.requestPushPermission()},15000)
   },[])
 
-  const checkNotifications=async()=>{
+  const checkNotifications=async(userId)=>{
     const [leadsRes,dealsRes]=await Promise.all([
-      supabase.from('leads').select('id,name,temperature,last_contact_date'),
-      supabase.from('deals').select('id,address,close_date')
+      supabase.from('leads').select('id,name,temperature,last_contact_date').eq('user_id',userId),
+      supabase.from('deals').select('id,address,close_date').eq('user_id',userId)
     ])
     const leads=leadsRes.data||[]
     const deals=dealsRes.data||[]

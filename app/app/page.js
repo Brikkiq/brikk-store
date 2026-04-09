@@ -29,8 +29,8 @@ export default function AppOverview(){
     const {data:{user}}=await supabase.auth.getUser()
     if(!user)return
     const [leadsRes,dealsRes,profileRes]=await Promise.all([
-      supabase.from('leads').select('*').order('created_at',{ascending:false}),
-      supabase.from('deals').select('*').order('created_at',{ascending:false}),
+      supabase.from('leads').select('*').eq('user_id',user.id).order('created_at',{ascending:false}),
+      supabase.from('deals').select('*').eq('user_id',user.id).order('created_at',{ascending:false}),
       supabase.from('profiles').select('*').eq('id',user.id).single()
     ])
     setLeads(leadsRes.data||[])

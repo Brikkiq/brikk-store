@@ -109,7 +109,7 @@ export default function Login(){
         <div style={{textAlign:"center",marginBottom:32}}>
           <a href="/" style={{fontSize:24,fontWeight:700,letterSpacing:"-0.02em",color:c.text,textDecoration:"none"}}>Brikk</a>
           <div style={{fontSize:14,color:c.sub,marginTop:8}}>{mode==='login'?'Welcome back':'Start your free trial'}</div>
-          {mode==='signup'&&<div style={{fontSize:12,color:c.green,fontWeight:600,marginTop:4}}>First 2 months free — no credit card</div>}
+          {mode==='signup'&&<div style={{fontSize:12,color:c.green,fontWeight:600,marginTop:4}}>First 45 days free — no credit card</div>}
         </div>
 
         <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:10,padding:"28px 24px"}}>

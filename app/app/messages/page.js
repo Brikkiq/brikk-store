@@ -30,7 +30,7 @@ export default function MessagesPage(){
     const {data:{user}}=await supabase.auth.getUser()
     if(!user)return
     const [leadsRes,profileRes]=await Promise.all([
-      supabase.from('leads').select('*').order('last_contact_date',{ascending:false}),
+      supabase.from('leads').select('*').eq('user_id',user.id).order('last_contact_date',{ascending:false}),
       supabase.from('profiles').select('*').eq('id',user.id).single()
     ])
     setLeads(leadsRes.data||[])

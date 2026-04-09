@@ -15,9 +15,11 @@ export default function CalendarPage(){
   useEffect(()=>{loadData()},[])
 
   const loadData=async()=>{
+    const {data:{user}}=await supabase.auth.getUser()
+    if(!user){setLoading(false);return}
     const [leadsRes,dealsRes]=await Promise.all([
-      supabase.from('leads').select('*').order('last_contact_date',{ascending:true}),
-      supabase.from('deals').select('*').order('close_date',{ascending:true})
+      supabase.from('leads').select('*').eq('user_id',user.id).order('last_contact_date',{ascending:true}),
+      supabase.from('deals').select('*').eq('user_id',user.id).order('close_date',{ascending:true})
     ])
     setLeads(leadsRes.data||[])
     setDeals(dealsRes.data||[])
