@@ -16,7 +16,7 @@ export default function LeadsPage(){
   const [showForm,setShowForm]=useState(false)
   const [editId,setEditId]=useState(null)
   const [filter,setFilter]=useState("all")
-  const [form,setForm]=useState({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:''})
+  const [form,setForm]=useState({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:'',last_contact_date:''})
 
   useEffect(()=>{loadLeads()},[])
 
@@ -29,17 +29,27 @@ export default function LeadsPage(){
     const {data:{user}}=await supabase.auth.getUser()
     if(!user)return
 
-    if(editId){
-      await supabase.from('leads').update({...form,updated_at:new Date().toISOString()}).eq('id',editId)
+    const saveData={...form}
+    // Use custom date or default to now
+    if(!saveData.last_contact_date){
+      saveData.last_contact_date=new Date().toISOString()
     }else{
-      await supabase.from('leads').insert({...form,user_id:user.id,last_contact_date:new Date().toISOString()})
+      saveData.last_contact_date=new Date(saveData.last_contact_date).toISOString()
     }
-    setForm({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:''})
+
+    if(editId){
+      const {last_contact_date,...rest}=saveData
+      await supabase.from('leads').update({...rest,last_contact_date,updated_at:new Date().toISOString()}).eq('id',editId)
+    }else{
+      await supabase.from('leads').insert({...saveData,user_id:user.id})
+    }
+    setForm({name:'',phone:'',email:'',source:'Zillow',temperature:'warm',stage:'New Lead',lead_type:'Buyer',price_range:'',notes:'',last_contact_date:''})
     setShowForm(false);setEditId(null);loadLeads()
   }
 
   const handleEdit=(lead)=>{
-    setForm({name:lead.name||'',phone:lead.phone||'',email:lead.email||'',source:lead.source||'Zillow',temperature:lead.temperature||'warm',stage:lead.stage||'New Lead',lead_type:lead.lead_type||'Buyer',price_range:lead.price_range||'',notes:lead.notes||''})
+    const lcd=lead.last_contact_date?new Date(lead.last_contact_date).toISOString().split('T')[0]:''
+    setForm({name:lead.name||'',phone:lead.phone||'',email:lead.email||'',source:lead.source||'Zillow',temperature:lead.temperature||'warm',stage:lead.stage||'New Lead',lead_type:lead.lead_type||'Buyer',price_range:lead.price_range||'',notes:lead.notes||'',last_contact_date:lcd})
     setEditId(lead.id);setShowForm(true)
   }
 
@@ -141,6 +151,12 @@ export default function LeadsPage(){
             <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Price Range</label>
             <input value={form.price_range} onChange={e=>setForm({...form,price_range:e.target.value})} placeholder="$275K - $350K"
               style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
+          </div>
+          <div>
+            <label style={{fontSize:11,fontWeight:600,color:c.sub,display:"block",marginBottom:4}}>Last Contacted</label>
+            <input type="date" value={form.last_contact_date} onChange={e=>setForm({...form,last_contact_date:e.target.value})}
+              style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.bg,fontFamily:"inherit",boxSizing:"border-box"}}/>
+            <div style={{fontSize:10,color:c.dim,marginTop:3}}>Leave blank for today</div>
           </div>
         </div>
         <div style={{marginBottom:16}}>
