@@ -59,6 +59,31 @@ Return ONLY the JSON, no other text.`
       const { question } = body
       if (!question) return NextResponse.json({ answer: "Ask me anything about Brikk!" })
 
+      // Local fallback answers for common questions (works even if API fails)
+      const q = question.toLowerCase()
+      const fallbacks = {
+        'price|cost|how much|pricing|expensive|cheap|afford': `Brikk Pro is $75/month for solo agents, and Teams is $200/month for up to 5 agents. There's a one-time $125 setup fee. Your first 45 days are completely free — no credit card needed.`,
+        'what is brikk|what does brikk do|point of this|what.s the point|purpose|what is this': `Brikk is the one screen you open every morning that tells you exactly what to do. It tracks your leads, drafts your follow-up messages with AI, manages your deals to closing, and shows you which marketing channels actually work. Think of it as your personal assistant that never forgets a lead.`,
+        'benefit|why should i|what will i get|help me|worth it|value': `Agents using a CRM close 26% more deals. Brikk goes further — it doesn't just store data, it tells you who to call and drafts the message for you. You stop losing leads to forgotten follow-ups, and you see exactly which marketing dollars are working. At $75/month, one extra closing pays for years of Brikk.`,
+        'feature|what can it do|capabilities|tools': `Brikk includes: AI Copilot that drafts personalized follow-ups, Lead Pipeline with 18 realtor-specific fields, Deal Tracker with stage progression, Smart Calendar auto-populated from your pipeline, Marketing ROI analytics, Messages with SMS delivery, Voice-to-CRM (speak and AI extracts lead info), and a Lead Capture Link you can put on your business card.`,
+        'trial|free|try it|test|demo': `Yes! You get 45 days completely free with full access to every feature. No credit card required. Just sign up at brikk.store/login and start adding your leads.`,
+        'different|competitor|lofty|follow up boss|boldtrail|compare': `Platforms like Lofty cost $300-500/month, require hours of training, and are built for large brokerages. Brikk is $75/month, takes 5 minutes to set up, and is built for solo agents. The biggest difference: Brikk's AI actually drafts your messages. It doesn't just remind you to follow up — it writes the follow-up for you.`,
+        'safe|security|data|privacy|secure': `Your data is fully secured. We use Supabase with row-level security — every agent can only see their own leads, deals, and messages. All data is encrypted in transit via HTTPS. We never sell your data. Full details at brikk.store/privacy.`,
+        'phone|mobile|app|iphone|android': `Brikk works on any device — iPhone, Android, tablet, or desktop. On your phone, go to brikk.store, tap "Add to Home Screen" and it works just like a native app with its own icon and full-screen experience. We're also submitting to the Apple App Store soon.`,
+        'cancel|contract|commitment|quit|stop': `No contracts, cancel anytime. You can stop your subscription with one click. Your data stays available for 30 days after cancellation in case you change your mind.`,
+        'text|sms|message|twilio': `Yes, you can text leads directly from Brikk. Type a message or let AI draft one for you, then send it. Messages are delivered via SMS to your lead's phone number. Full conversation history is saved per lead.`,
+        'ai|copilot|artificial intelligence|smart': `Brikk's AI Copilot reads each lead's full context — their temperature, how long since contact, their stage, their notes, and your entire conversation history. It drafts a personalized follow-up message that builds on previous conversations. You just tap approve, edit, or skip. It gets smarter the longer you use it.`,
+        'how.*(start|begin|sign|set)|get started|setup': `Just go to brikk.store/login and create your account. Add your first few leads, then click "AI Copilot" to see your first AI-drafted follow-ups. The whole setup takes about 5 minutes.`,
+      }
+
+      // Check fallbacks first
+      for (const [pattern, answer] of Object.entries(fallbacks)) {
+        if (new RegExp(pattern, 'i').test(q)) {
+          return NextResponse.json({ answer })
+        }
+      }
+
+      // Try AI for questions not in fallbacks
       try {
         const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
@@ -72,27 +97,28 @@ Return ONLY the JSON, no other text.`
             max_tokens: 300,
             system: `You are the AI assistant on Brikk's website (brikk.store). Brikk is an AI-powered command center for real estate agents. 
 
-Key facts about Brikk:
-- Price: $75/month for Pro (solo agents), $200/month for Teams (up to 5 agents)
-- One-time setup fee: $125
-- Free trial: 45 days, no credit card required
-- Features: AI Copilot (drafts follow-up messages), Lead Pipeline, Deal Tracker, Smart Calendar, Marketing ROI, Messages (SMS), Voice-to-CRM, Lead Capture Link
-- The AI reads conversation history and gets smarter over time
-- Built for solo agents and small teams who can't afford $300-500/month platforms like Lofty or BoldTrail
-- Works on iPhone, Android, and desktop
-- Data is secured with row-level security — each agent only sees their own data
-- SMS messaging via Twilio
-- Privacy policy: brikk.store/privacy
+Key facts:
+- Price: $75/month Pro (solo agents), $200/month Teams (up to 5). $125 one-time setup fee. 45-day free trial, no credit card.
+- Features: AI Copilot (drafts follow-ups using conversation history), Lead Pipeline (18 fields including pre-approval, timeline, bedrooms, contact preference), Deal Tracker (stage progression, close date countdown), Smart Calendar (auto-populated), Marketing ROI (source analytics), Messages (SMS via Twilio), Voice-to-CRM (speak and AI extracts lead info), Lead Capture Link (/refer)
+- Competitors charge $300-500/month. Brikk is simpler, cheaper, and the AI actually acts.
+- Works on iPhone, Android, desktop. iOS app coming to App Store.
+- Data secured with row-level security. Never sold. Privacy policy at brikk.store/privacy.
+- No contracts, cancel anytime.
+- Built by a small team passionate about helping agents close more deals.
 
-Be helpful, warm, concise. Keep answers under 3 sentences unless they ask for detail. Never make up features that don't exist. If you don't know something, say "Great question — email brikkiq@gmail.com and we'll get back to you." Don't use bullet points. Sound like a real person, not a corporate bot.`,
+Be warm, concise, honest. 2-3 sentences max unless they ask for detail. Sound human, not corporate. If unsure, say "Great question — reach out to hello@brikk.store and we'll help you out."`,
             messages: [{ role: 'user', content: question }]
           })
         })
         const data = await res.json()
-        const answer = data.content?.[0]?.text || "Sorry, I couldn't process that. Try asking another way."
-        return NextResponse.json({ answer })
+        if (data.content && data.content[0] && data.content[0].text) {
+          return NextResponse.json({ answer: data.content[0].text })
+        }
+        // API returned but no text — use generic helpful response
+        return NextResponse.json({ answer: "Brikk is an AI command center for real estate agents — it drafts your follow-ups, tracks your leads, and tells you exactly who to call every morning. Try it free for 45 days at brikk.store/login. What specific questions do you have?" })
       } catch (err) {
-        return NextResponse.json({ answer: "I'm having trouble connecting right now. Email brikkiq@gmail.com and we'll help you out." })
+        console.error('Help chat API error:', err)
+        return NextResponse.json({ answer: "Brikk is an AI-powered command center for real estate agents. It costs $75/month with a 45-day free trial. What would you like to know more about — features, pricing, or how to get started?" })
       }
     }
 
