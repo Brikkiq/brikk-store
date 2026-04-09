@@ -2,10 +2,10 @@ import './globals.css'
 
 export const metadata = {
   title: 'Brikk — Built to Close',
-  description: 'The command center for real estate agents. One screen. Every deal. Nothing missed. AI-powered follow-up that actually happens.',
+  description: 'The command center for real estate agents. AI-powered follow-ups, lead management, deal tracking. $75/month.',
   openGraph: {
     title: 'Brikk — Built to Close',
-    description: 'The command center for real estate agents. One screen. Every deal. Nothing missed.',
+    description: 'The command center for real estate agents. One screen. Every deal. AI that acts.',
     type: 'website',
     url: 'https://brikk.store',
     siteName: 'Brikk',
@@ -29,7 +29,7 @@ export default function RootLayout({ children }) {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Brikk" />
-        <link rel="apple-touch-icon" href="/favicon.svg" />
+        <link rel="apple-touch-icon" href="/icon-180.png" />
       </head>
       <body>{children}</body>
     </html>
