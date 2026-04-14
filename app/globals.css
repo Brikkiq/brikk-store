@@ -211,3 +211,110 @@ input[type="range"]::-webkit-slider-thumb {
 .page-content {
   animation: fadeIn 0.2s ease-out;
 }
+
+/* === DARK MODE === */
+html.brikk-dark body {
+  background: #0D0D0C !important;
+  color: #E8E8E4 !important;
+}
+
+html.brikk-dark div,
+html.brikk-dark section,
+html.brikk-dark main,
+html.brikk-dark header,
+html.brikk-dark nav,
+html.brikk-dark footer {
+  border-color: #2A2A28 !important;
+}
+
+/* Backgrounds */
+html.brikk-dark [style*="background:#FAFAF9"],
+html.brikk-dark [style*="background: #FAFAF9"],
+html.brikk-dark [style*="background:\"#FAFAF9\""] {
+  background: #0D0D0C !important;
+}
+
+html.brikk-dark [style*="background:#FFFFFF"],
+html.brikk-dark [style*="background: #FFFFFF"],
+html.brikk-dark [style*="background:#fff"],
+html.brikk-dark [style*="background: #fff"],
+html.brikk-dark [style*="background:rgb(255"],
+html.brikk-dark [style*="background:rgba(255,255,255"] {
+  background: #161614 !important;
+}
+
+/* Cards, containers, form elements */
+html.brikk-dark input,
+html.brikk-dark select,
+html.brikk-dark textarea {
+  background: #1E1E1C !important;
+  color: #E8E8E4 !important;
+  border-color: #333330 !important;
+}
+
+html.brikk-dark input::placeholder,
+html.brikk-dark textarea::placeholder {
+  color: #666662 !important;
+}
+
+/* Text colors */
+html.brikk-dark [style*="color:#1A1A18"],
+html.brikk-dark [style*="color: #1A1A18"],
+html.brikk-dark [style*="color:\"#1A1A18\""] {
+  color: #E8E8E4 !important;
+}
+
+html.brikk-dark [style*="color:#6B6B66"],
+html.brikk-dark [style*="color: #6B6B66"] {
+  color: #9C9C96 !important;
+}
+
+html.brikk-dark [style*="color:#9C9C96"],
+html.brikk-dark [style*="color: #9C9C96"] {
+  color: #7A7A74 !important;
+}
+
+/* Frosted glass nav */
+html.brikk-dark [style*="rgba(255,255,255,0.94)"],
+html.brikk-dark [style*="rgba(255,255,255,0.92)"],
+html.brikk-dark [style*="rgba(255,255,255,0.85)"],
+html.brikk-dark [style*="rgba(255,255,255,0.8)"] {
+  background: rgba(13,13,12,0.94) !important;
+}
+
+/* Border light */
+html.brikk-dark [style*="border:1px solid #E8E8E4"],
+html.brikk-dark [style*="border: 1px solid #E8E8E4"] {
+  border-color: #2A2A28 !important;
+}
+
+html.brikk-dark [style*="#F0F0EC"] {
+  background: #1E1E1C !important;
+}
+
+/* Buttons with dark background stay dark */
+html.brikk-dark [style*="background:#1A1A18"] {
+  background: #E8E8E4 !important;
+  color: #0D0D0C !important;
+}
+
+/* Scrollbar dark */
+html.brikk-dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Selection */
+html.brikk-dark ::selection {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* Skeleton shimmer dark */
+html.brikk-dark .skeleton {
+  background: linear-gradient(90deg, #1E1E1C 25%, #2A2A28 50%, #1E1E1C 75%);
+  background-size: 200% 100%;
+}
+
+/* SVG icons in dark mode */
+html.brikk-dark svg[stroke="currentColor"] {
+  stroke: #E8E8E4;
+}

@@ -42,7 +42,23 @@ export default function AppLayout({children}){
       if(!user){window.location.href='/login'}
       else{setUser(user);setLoading(false);checkNotifications(user.id)}
     })
-    if(typeof window!=='undefined')setCurrentPath(window.location.pathname)
+    if(typeof window!=='undefined'){
+      setCurrentPath(window.location.pathname)
+      // Apply saved appearance settings on every page load
+      try{
+        const saved=JSON.parse(localStorage.getItem('brikk-appearance')||'{}')
+        if(saved.darkMode)document.documentElement.classList.add('brikk-dark')
+        else document.documentElement.classList.remove('brikk-dark')
+        if(saved.brightness&&saved.brightness<100)document.documentElement.style.filter=`brightness(${saved.brightness/100})`
+        if(saved.blueLight&&saved.blueLight>0){
+          let ov=document.getElementById('brikk-bluelight')
+          if(!ov){ov=document.createElement('div');ov.id='brikk-bluelight';ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:99999';document.body.appendChild(ov)}
+          ov.style.background=`rgba(255,180,50,${saved.blueLight/100*0.3})`
+        }
+        const scales={small:0.9,medium:1,large:1.1}
+        if(saved.textSize)document.documentElement.style.fontSize=`${(scales[saved.textSize]||1)*16}px`
+      }catch(e){}
+    }
     setTimeout(()=>{if(window.brikk?.requestPushPermission)window.brikk.requestPushPermission()},15000)
   },[])
 

@@ -24,20 +24,31 @@ export async function POST(request) {
             max_tokens: 500,
             messages: [{
               role: 'user',
-              content: `You are an AI assistant for a real estate CRM. Extract structured data from this voice note by a real estate agent.
+              content: `You are an AI assistant for a real estate agent's CRM. Extract structured data from this voice note. The agent is talking about their leads, showings, offers, or general real estate business.
 
 Voice transcript: "${transcript}"
 
-Return ONLY valid JSON with these fields (use null for anything not mentioned):
+Instructions:
+- If a person's name is mentioned, always put it in "lead_name" (assume they're an existing lead unless clearly new)
+- Extract what happened or needs to happen as the "action"
+- Look for prices, addresses, property details
+- Determine if the lead is a Buyer or Seller
+- Detect urgency and suggest a temperature (hot/warm/cold)
+- Detect what stage they're in (New Lead, Contacted, Showing, Offer Sent, Under Contract, Closing)
+- Clean up the transcript into proper sentences for "raw"
+
+Return ONLY valid JSON:
 {
-  "new_lead_name": "name if a new person is mentioned",
-  "lead_name": "name if referring to an existing lead",
+  "lead_name": "full name of the person mentioned (first and last if available)",
+  "new_lead_name": "only if explicitly stated as a new/unknown contact, otherwise null",
   "action": "what was done or needs to be done",
-  "price": "any price mentioned",
-  "notes": "summary of the note for CRM",
-  "lead_type": "Buyer or Seller if clear",
+  "price": "any price or budget mentioned",
+  "notes": "clean 1-2 sentence CRM summary",
+  "lead_type": "Buyer or Seller",
   "phone": "phone number if mentioned",
-  "raw": "the original transcript cleaned up"
+  "stage": "detected stage or null",
+  "temperature": "hot, warm, or cold based on urgency",
+  "raw": "cleaned up transcript"
 }
 
 Return ONLY the JSON, no other text.`

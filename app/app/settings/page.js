@@ -53,27 +53,19 @@ export default function SettingsPage(){
     if(typeof window==='undefined')return
     localStorage.setItem('brikk-appearance',JSON.stringify({darkMode,blueLight,brightness,textSize}))
 
-    // Dark mode
+    // Dark mode — add/remove class that CSS handles
     if(darkMode){
-      document.documentElement.style.setProperty('--brikk-bg','#0D0D0C')
-      document.documentElement.style.setProperty('--brikk-white','#1A1A18')
-      document.documentElement.style.setProperty('--brikk-text','#FAFAF9')
-      document.documentElement.style.setProperty('--brikk-sub','#A0A09A')
-      document.documentElement.style.setProperty('--brikk-border','#2A2A28')
-      document.body.style.background='#0D0D0C'
-      document.body.style.color='#FAFAF9'
+      document.documentElement.classList.add('brikk-dark')
     }else{
-      document.documentElement.style.setProperty('--brikk-bg','#FAFAF9')
-      document.documentElement.style.setProperty('--brikk-white','#FFFFFF')
-      document.documentElement.style.setProperty('--brikk-text','#1A1A18')
-      document.documentElement.style.setProperty('--brikk-sub','#6B6B66')
-      document.documentElement.style.setProperty('--brikk-border','#E8E8E4')
-      document.body.style.background='#FAFAF9'
-      document.body.style.color='#1A1A18'
+      document.documentElement.classList.remove('brikk-dark')
     }
 
     // Brightness
-    document.documentElement.style.filter=brightness<100?`brightness(${brightness/100})`:''
+    if(brightness<100){
+      document.documentElement.style.filter=`brightness(${brightness/100})`
+    }else{
+      document.documentElement.style.filter=''
+    }
 
     // Blue light
     let overlay=document.getElementById('brikk-bluelight')
@@ -82,9 +74,11 @@ export default function SettingsPage(){
       overlay.style.background=`rgba(255,180,50,${blueLight/100*0.3})`
     }else if(overlay){overlay.style.background='transparent'}
 
-    // Text size
-    const sizes={small:'14px',medium:'16px',large:'18px'}
-    document.documentElement.style.fontSize=sizes[textSize]||'16px'
+    // Text size — scale the entire page
+    const scales={small:0.9,medium:1,large:1.1}
+    document.documentElement.style.fontSize=`${(scales[textSize]||1)*16}px`
+    // Also set a CSS variable for components that use fixed px
+    document.documentElement.style.setProperty('--brikk-scale',scales[textSize]||1)
   },[darkMode,blueLight,brightness,textSize])
 
   const loadProfile=async()=>{

@@ -114,19 +114,75 @@ export default function AppOverview(){
   const saveVoiceNote=async()=>{
     const {data:{user}}=await supabase.auth.getUser()
     if(!user)return
-    // If we have a lead match, add as interaction
-    if(voiceResult?.lead_id){
-      await supabase.from('interactions').insert({user_id:user.id,lead_id:voiceResult.lead_id,interaction_type:'voice_note',notes:voiceResult.raw||transcript})
-      await supabase.from('leads').update({last_contact_date:new Date().toISOString(),notes:voiceResult.notes||transcript}).eq('id',voiceResult.lead_id)
-    }else if(voiceResult?.new_lead_name){
-      await supabase.from('leads').insert({user_id:user.id,name:voiceResult.new_lead_name,phone:voiceResult.phone||'',notes:voiceResult.raw||transcript,source:'Voice Note',temperature:'warm',stage:'New Lead',lead_type:voiceResult.lead_type||'Buyer'})
-    }else{
-      // Save as general note interaction
-      await supabase.from('interactions').insert({user_id:user.id,interaction_type:'voice_note',notes:transcript})
+
+    // Try to match lead by name from the extraction
+    const matchName=voiceResult?.lead_name||voiceResult?.new_lead_name||null
+    let matchedLead=null
+
+    if(matchName){
+      // Fuzzy match — find lead whose name contains the extracted name or vice versa
+      const searchName=matchName.toLowerCase().trim()
+      matchedLead=leads.find(l=>{
+        const ln=l.name?.toLowerCase()||''
+        return ln.includes(searchName)||searchName.includes(ln)||
+          ln.split(' ')[0]===searchName.split(' ')[0] // First name match
+      })
     }
-    setShowVoice(false);setTranscript('');setVoiceResult(null)
+
+    if(matchedLead){
+      // Update existing lead
+      const updateData={last_contact_date:new Date().toISOString(),updated_at:new Date().toISOString()}
+
+      // Append to notes instead of replacing
+      const existingNotes=matchedLead.notes||''
+      const newNote=voiceResult?.notes||voiceResult?.raw||transcript
+      updateData.notes=existingNotes?`${existingNotes}\n\n[Voice ${new Date().toLocaleDateString()}] ${newNote}`:`[Voice ${new Date().toLocaleDateString()}] ${newNote}`
+
+      // Update specific fields if AI extracted them
+      if(voiceResult?.price&&!matchedLead.price_range)updateData.price_range=voiceResult.price
+      if(voiceResult?.stage)updateData.stage=voiceResult.stage
+      if(voiceResult?.temperature)updateData.temperature=voiceResult.temperature
+
+      await supabase.from('leads').update(updateData).eq('id',matchedLead.id)
+
+      // Log interaction
+      await supabase.from('interactions').insert({
+        user_id:user.id,
+        lead_id:matchedLead.id,
+        interaction_type:'voice_note',
+        notes:newNote
+      })
+
+      setVoiceResult(prev=>({...prev,saved:true,savedTo:matchedLead.name}))
+    }else if(matchName){
+      // Create new lead from voice
+      await supabase.from('leads').insert({
+        user_id:user.id,
+        name:matchName,
+        phone:voiceResult?.phone||'',
+        notes:`[Voice ${new Date().toLocaleDateString()}] ${voiceResult?.notes||voiceResult?.raw||transcript}`,
+        source:'Voice Note',
+        temperature:voiceResult?.temperature||'warm',
+        stage:voiceResult?.stage||'New Lead',
+        lead_type:voiceResult?.lead_type||'Buyer',
+        price_range:voiceResult?.price||'',
+        last_contact_date:new Date().toISOString()
+      })
+      setVoiceResult(prev=>({...prev,saved:true,savedTo:matchName+' (new lead)'}))
+    }else{
+      // No name found — save as general interaction
+      await supabase.from('interactions').insert({
+        user_id:user.id,
+        interaction_type:'voice_note',
+        notes:`[Voice ${new Date().toLocaleDateString()}] ${transcript}`
+      })
+      setVoiceResult(prev=>({...prev,saved:true,savedTo:'General notes'}))
+    }
+
     if(window.brikk?.haptic)window.brikk.haptic('success')
     loadData()
+    // Auto close after 1.5s
+    setTimeout(()=>{setShowVoice(false);setTranscript('');setVoiceResult(null)},1500)
   }
 
   // Build action items
@@ -456,19 +512,45 @@ export default function AppOverview(){
 
           {/* AI extraction result */}
           {voiceResult&&!voiceProcessing&&<div style={{marginBottom:16}}>
-            <div style={{background:"rgba(109,40,217,0.04)",border:`1px solid ${c.purpleBorder}`,borderRadius:8,padding:"14px 16px",marginBottom:12}}>
-              <div style={{fontSize:10,fontWeight:600,color:c.purple,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>AI Extracted</div>
-              {voiceResult.new_lead_name&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>New lead: <strong>{voiceResult.new_lead_name}</strong></div>}
-              {voiceResult.lead_name&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Lead: <strong>{voiceResult.lead_name}</strong></div>}
-              {voiceResult.action&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Action: {voiceResult.action}</div>}
-              {voiceResult.price&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Price: {voiceResult.price}</div>}
-              {voiceResult.notes&&<div style={{fontSize:13,color:c.sub,marginTop:6}}>{voiceResult.notes}</div>}
-              {voiceResult.note&&<div style={{fontSize:12,color:c.dim,marginTop:6,fontStyle:"italic"}}>{voiceResult.note}</div>}
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={saveVoiceNote} style={{flex:1,background:c.text,border:"none",borderRadius:8,padding:"12px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Save to CRM</button>
-              <button onClick={()=>{setShowVoice(false);setTranscript('');setVoiceResult(null)}} style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:8,padding:"12px 20px",fontSize:13,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>Discard</button>
-            </div>
+            {/* Saved confirmation */}
+            {voiceResult.saved?<div style={{background:"rgba(22,128,60,0.06)",border:"1px solid rgba(22,128,60,0.15)",borderRadius:12,padding:"20px 16px",textAlign:"center"}}>
+              <div style={{fontSize:24,marginBottom:8}}>✓</div>
+              <div style={{fontSize:15,fontWeight:700,color:"#16803C"}}>Saved to CRM</div>
+              <div style={{fontSize:13,color:c.sub,marginTop:4}}>Updated: {voiceResult.savedTo}</div>
+            </div>:
+            <>
+              {/* Lead match preview */}
+              {(voiceResult.lead_name||voiceResult.new_lead_name)&&<div style={{background:"rgba(109,40,217,0.04)",border:`1px solid ${c.purpleBorder}`,borderRadius:12,padding:"16px",marginBottom:12}}>
+                <div style={{fontSize:10,fontWeight:600,color:c.purple,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>AI Extracted</div>
+                {/* Check if we found a match */}
+                {(()=>{
+                  const matchName=(voiceResult.lead_name||voiceResult.new_lead_name||'').toLowerCase().trim()
+                  const match=leads.find(l=>{const ln=l.name?.toLowerCase()||'';return ln.includes(matchName)||matchName.includes(ln)||ln.split(' ')[0]===matchName.split(' ')[0]})
+                  return match?
+                    <div style={{background:"rgba(22,128,60,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:8,border:"1px solid rgba(22,128,60,0.12)"}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#16803C"}}>Matched to existing lead</div>
+                      <div style={{fontSize:14,fontWeight:700,marginTop:2}}>{match.name}</div>
+                      <div style={{fontSize:11,color:c.dim}}>{match.temperature} / {match.stage} / {match.source}</div>
+                    </div>:
+                    <div style={{background:"rgba(161,98,7,0.06)",borderRadius:8,padding:"10px 12px",marginBottom:8,border:"1px solid rgba(161,98,7,0.12)"}}>
+                      <div style={{fontSize:12,fontWeight:600,color:"#A16207"}}>New lead will be created</div>
+                      <div style={{fontSize:14,fontWeight:700,marginTop:2}}>{voiceResult.lead_name||voiceResult.new_lead_name}</div>
+                    </div>
+                })()}
+                {voiceResult.action&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Action: {voiceResult.action}</div>}
+                {voiceResult.price&&<div style={{fontSize:13,color:c.text,marginBottom:4}}>Price: {voiceResult.price}</div>}
+                {voiceResult.notes&&<div style={{fontSize:13,color:c.sub,marginTop:6}}>{voiceResult.notes}</div>}
+              </div>}
+              {!(voiceResult.lead_name||voiceResult.new_lead_name)&&voiceResult.raw&&<div style={{background:c.bg,borderRadius:12,padding:"16px",marginBottom:12,border:`1px solid ${c.border}`}}>
+                <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:6}}>Voice Note</div>
+                <div style={{fontSize:13,color:c.sub}}>{voiceResult.raw}</div>
+                <div style={{fontSize:11,color:c.dim,marginTop:6,fontStyle:"italic"}}>No lead name detected — will save as general note</div>
+              </div>}
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={saveVoiceNote} style={{flex:1,background:c.text,border:"none",borderRadius:10,padding:"14px",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Save to CRM</button>
+                <button onClick={()=>{setShowVoice(false);setTranscript('');setVoiceResult(null)}} style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:10,padding:"14px 20px",fontSize:13,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>Discard</button>
+              </div>
+            </>}
           </div>}
 
           {/* Start recording again */}
