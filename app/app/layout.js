@@ -34,8 +34,12 @@ export default function AppLayout({children}){
   const [notification,setNotification]=useState(null)
   const [dismissed,setDismissed]=useState(false)
   const [pageTransition,setPageTransition]=useState(true)
+  const [refreshing,setRefreshing]=useState(false)
+  const [pullDistance,setPullDistance]=useState(0)
   const touchStartX=useRef(0)
   const touchEndX=useRef(0)
+  const touchStartY=useRef(0)
+  const isPulling=useRef(false)
 
   useEffect(()=>{
     supabase.auth.getUser().then(({data:{user}})=>{
@@ -44,31 +48,63 @@ export default function AppLayout({children}){
     })
     if(typeof window!=='undefined'){
       setCurrentPath(window.location.pathname)
-      // Apply saved appearance settings on every page load
       try{
         const saved=JSON.parse(localStorage.getItem('brikk-appearance')||'{}')
         if(saved.darkMode)document.documentElement.classList.add('brikk-dark')
         else document.documentElement.classList.remove('brikk-dark')
-        if(saved.brightness&&saved.brightness<100)document.documentElement.style.filter=`brightness(${saved.brightness/100})`
+        // Brightness classes
+        document.documentElement.classList.remove('brikk-dim-90','brikk-dim-80','brikk-dim-70','brikk-dim-60','brikk-dim-50')
+        if(saved.brightness){
+          const b=saved.brightness
+          if(b<=55)document.documentElement.classList.add('brikk-dim-50')
+          else if(b<=65)document.documentElement.classList.add('brikk-dim-60')
+          else if(b<=75)document.documentElement.classList.add('brikk-dim-70')
+          else if(b<=85)document.documentElement.classList.add('brikk-dim-80')
+          else if(b<=95)document.documentElement.classList.add('brikk-dim-90')
+        }
         if(saved.blueLight&&saved.blueLight>0){
           let ov=document.getElementById('brikk-bluelight')
           if(!ov){ov=document.createElement('div');ov.id='brikk-bluelight';ov.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:99999';document.body.appendChild(ov)}
           ov.style.background=`rgba(255,180,50,${saved.blueLight/100*0.3})`
         }
-        const scales={small:0.9,medium:1,large:1.1}
-        if(saved.textSize)document.documentElement.style.fontSize=`${(scales[saved.textSize]||1)*16}px`
+        document.documentElement.classList.remove('brikk-text-small','brikk-text-large')
+        if(saved.textSize==='small')document.documentElement.classList.add('brikk-text-small')
+        if(saved.textSize==='large')document.documentElement.classList.add('brikk-text-large')
       }catch(e){}
     }
     setTimeout(()=>{if(window.brikk?.requestPushPermission)window.brikk.requestPushPermission()},15000)
   },[])
 
-  // Swipe navigation
+  // Swipe navigation + pull to refresh
   const allPages=['/app','/app/copilot','/app/leads','/app/deals','/app/calendar','/app/messages','/app/settings']
-  const handleTouchStart=(e)=>{touchStartX.current=e.changedTouches[0].screenX}
+  const handleTouchStart=(e)=>{
+    touchStartX.current=e.changedTouches[0].screenX
+    touchStartY.current=e.changedTouches[0].screenY
+    if(window.scrollY===0)isPulling.current=true
+  }
+  const handleTouchMove=(e)=>{
+    if(!isPulling.current)return
+    const dy=e.changedTouches[0].screenY-touchStartY.current
+    if(dy>0&&window.scrollY===0){
+      setPullDistance(Math.min(dy*0.4,80))
+    }
+  }
   const handleTouchEnd=(e)=>{
+    // Pull to refresh
+    if(pullDistance>50&&!refreshing){
+      setRefreshing(true)
+      setPullDistance(0)
+      setTimeout(()=>{window.location.reload()},800)
+    }else{
+      setPullDistance(0)
+    }
+    isPulling.current=false
+
+    // Swipe left/right navigation
     touchEndX.current=e.changedTouches[0].screenX
     const diff=touchStartX.current-touchEndX.current
-    if(Math.abs(diff)<80)return
+    const dy=Math.abs(e.changedTouches[0].screenY-touchStartY.current)
+    if(Math.abs(diff)<80||dy>Math.abs(diff))return
     const idx=allPages.indexOf(currentPath)
     if(idx===-1)return
     if(diff>0&&idx<allPages.length-1){
@@ -113,7 +149,12 @@ export default function AppLayout({children}){
   const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",green:"#16803C",red:"#BE123C",amber:"#A16207",purple:"#6D28D9"}
 
   return(
-    <div style={{background:c.bg,minHeight:"100vh",fontFamily:"'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif",WebkitFontSmoothing:"antialiased",paddingBottom:88}} onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div style={{background:c.bg,minHeight:"100vh",fontFamily:"'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif",WebkitFontSmoothing:"antialiased",paddingBottom:88}} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+
+      {/* Pull to refresh indicator */}
+      {(pullDistance>0||refreshing)&&<div style={{display:"flex",justifyContent:"center",padding:`${refreshing?20:pullDistance*0.3}px 0`,transition:refreshing?'none':'padding 0.1s ease'}}>
+        <div style={{width:28,height:28,borderRadius:"50%",border:`2.5px solid ${c.border}`,borderTopColor:c.text,display:"flex",alignItems:"center",justifyContent:"center",opacity:refreshing?1:Math.min(pullDistance/50,1),transform:`rotate(${pullDistance*4}deg)`}} className={refreshing?"refresh-spinner":""}/>
+      </div>}
       <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
       <style>{`
         @media(min-width:769px){.mobile-nav{display:none!important}.desktop-nav{display:flex!important}}
@@ -141,7 +182,7 @@ export default function AppLayout({children}){
       {/* Desktop top nav */}
       <header className="desktop-nav" style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 28px",borderBottom:`1px solid ${c.border}`,background:"rgba(255,255,255,0.8)",backdropFilter:"blur(12px)",position:"sticky",top:0,zIndex:50}}>
         <div style={{display:"flex",alignItems:"center",gap:24}}>
-          <span style={{fontSize:17,fontWeight:700,letterSpacing:"-0.02em",color:c.text}}>Brikk</span>
+          <span style={{fontSize:28,fontWeight:800,letterSpacing:"-0.03em",color:c.text}}>Brikk</span>
           <nav style={{display:"flex",gap:1,background:c.bg,borderRadius:10,padding:3,border:`1px solid ${c.border}`}}>
             {navItems.map(n=>(
               <a key={n.href} href={n.href} style={{background:currentPath===n.href?c.text:"transparent",color:currentPath===n.href?"#fff":c.dim,borderRadius:8,padding:"7px 16px",fontSize:12,fontWeight:600,textDecoration:"none",whiteSpace:"nowrap",transition:"all 0.15s ease"}}>{n.label}</a>
@@ -156,7 +197,7 @@ export default function AppLayout({children}){
 
       {/* Mobile top bar */}
       <header className="mobile-nav" style={{display:"none",alignItems:"center",justifyContent:"space-between",padding:"14px 18px",borderBottom:`1px solid ${c.border}`,background:"rgba(255,255,255,0.85)",backdropFilter:"blur(16px)",WebkitBackdropFilter:"blur(16px)",position:"sticky",top:0,zIndex:50}}>
-        <span style={{fontSize:18,fontWeight:700,letterSpacing:"-0.02em"}}>Brikk</span>
+        <span style={{fontSize:28,fontWeight:800,letterSpacing:"-0.03em"}}>Brikk</span>
         <a href="/app/settings" style={{display:"flex",alignItems:"center",justifyContent:"center",width:34,height:34,borderRadius:10,background:currentPath==='/app/settings'?"#1A1A18":"#F0F0EC",color:currentPath==='/app/settings'?"#fff":"#6B6B66",textDecoration:"none"}}><Icon name="settings" size={18}/></a>
       </header>
 

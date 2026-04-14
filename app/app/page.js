@@ -22,6 +22,8 @@ export default function AppOverview(){
   const [voiceProcessing,setVoiceProcessing]=useState(false)
   const [voiceResult,setVoiceResult]=useState(null)
   const [showVoice,setShowVoice]=useState(false)
+  const [dismissWelcome,setDismissWelcome]=useState(false)
+  const [dismissReferral,setDismissReferral]=useState(false)
 
   useEffect(()=>{loadData()},[])
 
@@ -311,7 +313,6 @@ export default function AppOverview(){
   const pendingActions=actions.filter(a=>!completedActions.includes(a.id))
   const completedCount=completedActions.length
   const totalCommission=deals.reduce((s,d)=>s+(d.commission||0),0)
-  const goal=profile?.annual_goal||200000
   const hour=new Date().getHours()
   const greeting=hour<12?'morning':hour<17?'afternoon':'evening'
   const firstName=profile?.full_name?profile.full_name.split(' ')[0]:''
@@ -354,15 +355,6 @@ export default function AppOverview(){
           <div style={{fontSize:20,fontWeight:700,color:c.green}}>${(totalCommission/1000).toFixed(1)}K</div>
         </div>
       </div>
-
-      {/* Goal progress */}
-      {goal>0&&<div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",marginBottom:20}}>
-        <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-          <span style={{fontSize:11,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em"}}>Annual Goal</span>
-          <span style={{fontSize:12,fontWeight:600,color:c.green}}>${(totalCommission/1000).toFixed(1)}K of ${(goal/1000).toFixed(0)}K</span>
-        </div>
-        <Progress value={totalCommission} max={goal} color={c.green}/>
-      </div>}
 
       {/* Completed counter */}
       {completedCount>0&&(
@@ -413,9 +405,10 @@ export default function AppOverview(){
           </div>
         </div>
       ):(
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"40px 20px",textAlign:"center"}}>
-          {leads.length===0&&deals.length===0?(
+        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"40px 20px",textAlign:"center",position:"relative"}}>
+          {leads.length===0&&deals.length===0&&!dismissWelcome?(
             <>
+              <button onClick={()=>setDismissWelcome(true)} style={{position:"absolute",top:12,right:12,background:"none",border:"none",fontSize:16,color:c.dim,cursor:"pointer",padding:"4px"}}>×</button>
               <div style={{fontSize:16,fontWeight:600,marginBottom:8}}>Welcome to Brikk</div>
               <div style={{fontSize:13,color:c.sub,marginBottom:16,lineHeight:1.6}}>Start by adding your leads. Once you have leads and deals, this screen will tell you exactly what to do every day.</div>
               <a href="/app/leads" style={{fontSize:13,fontWeight:600,color:"#fff",background:c.text,padding:"10px 22px",borderRadius:6,textDecoration:"none"}}>Add Your First Lead</a>
@@ -430,7 +423,8 @@ export default function AppOverview(){
       )}
 
       {/* Referral link */}
-      <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",marginTop:20}}>
+      {!dismissReferral&&<div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",marginTop:20,position:"relative"}}>
+        <button onClick={()=>setDismissReferral(true)} style={{position:"absolute",top:12,right:12,background:"none",border:"none",fontSize:16,color:c.dim,cursor:"pointer",padding:"4px"}}>×</button>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
           <div>
             <div style={{fontSize:14,fontWeight:600,marginBottom:4}}>Your Lead Capture Link</div>
