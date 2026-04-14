@@ -6,14 +6,28 @@ import { supabase } from '@/lib/supabase'
 const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",green:"#16803C",greenSoft:"rgba(22,128,60,0.06)",greenBorder:"rgba(22,128,60,0.15)",amber:"#A16207",amberSoft:"rgba(161,98,7,0.06)",red:"#BE123C",redSoft:"rgba(190,18,60,0.06)",purple:"#6D28D9",purpleSoft:"rgba(109,40,217,0.05)",purpleBorder:"rgba(109,40,217,0.12)"}
 
 const navItems=[
-  {label:"Home",href:"/app",icon:"H"},
-  {label:"Copilot",href:"/app/copilot",icon:"C"},
-  {label:"Leads",href:"/app/leads",icon:"L"},
-  {label:"Deals",href:"/app/deals",icon:"D"},
-  {label:"Calendar",href:"/app/calendar",icon:"K"},
-  {label:"Marketing",href:"/app/marketing",icon:"M"},
-  {label:"Messages",href:"/app/messages",icon:"T"},
+  {label:"Home",href:"/app",iconKey:"home"},
+  {label:"Copilot",href:"/app/copilot",iconKey:"copilot"},
+  {label:"Leads",href:"/app/leads",iconKey:"leads"},
+  {label:"Deals",href:"/app/deals",iconKey:"deals"},
+  {label:"Calendar",href:"/app/calendar",iconKey:"calendar"},
+  {label:"Marketing",href:"/app/marketing",iconKey:"marketing"},
+  {label:"Messages",href:"/app/messages",iconKey:"messages"},
 ]
+
+const Icon=({name,size=20})=>{
+  const props={width:size,height:size,viewBox:"0 0 24 24",fill:"none",stroke:"currentColor",strokeWidth:2,strokeLinecap:"round",strokeLinejoin:"round"}
+  switch(name){
+    case 'home':return <svg {...props}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    case 'copilot':return <svg {...props}><circle cx="12" cy="12" r="3"/><path d="M12 1v4"/><path d="M12 19v4"/><path d="M4.22 4.22l2.83 2.83"/><path d="M16.95 16.95l2.83 2.83"/><path d="M1 12h4"/><path d="M19 12h4"/><path d="M4.22 19.78l2.83-2.83"/><path d="M16.95 7.05l2.83-2.83"/></svg>
+    case 'leads':return <svg {...props}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    case 'deals':return <svg {...props}><path d="M12 1v22"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+    case 'calendar':return <svg {...props}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    case 'marketing':return <svg {...props}><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    case 'messages':return <svg {...props}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+    default:return null
+  }
+}
 
 export default function AppLayout({children}){
   const [user,setUser]=useState(null)
@@ -153,13 +167,17 @@ export default function AppLayout({children}){
       </main>
 
       {/* Mobile bottom tab bar */}
-      <nav className="mobile-bottom-nav" style={{display:"none",position:"fixed",bottom:0,left:0,right:0,background:c.white,borderTop:`1px solid ${c.border}`,padding:"8px 0 env(safe-area-inset-bottom, 8px)",zIndex:100,justifyContent:"space-around"}}>
-        {navItems.map(n=>(
-          <a key={n.href} href={n.href} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:3,textDecoration:"none",padding:"6px 8px",borderRadius:8,flex:1}}>
-            <div style={{width:28,height:28,borderRadius:8,background:currentPath===n.href?c.text:c.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:currentPath===n.href?"#fff":c.dim}}>{n.icon}</div>
-            <span style={{fontSize:9,fontWeight:600,color:currentPath===n.href?c.text:c.dim}}>{n.label}</span>
-          </a>
-        ))}
+      <nav className="mobile-bottom-nav" style={{display:"none",position:"fixed",bottom:0,left:0,right:0,background:"rgba(255,255,255,0.92)",backdropFilter:"blur(20px)",WebkitBackdropFilter:"blur(20px)",borderTop:`1px solid ${c.border}`,padding:"6px 4px env(safe-area-inset-bottom, 6px)",zIndex:100,justifyContent:"space-around"}}>
+        {navItems.map(n=>{
+          const active=currentPath===n.href
+          return(
+            <a key={n.href} href={n.href} style={{display:"flex",flexDirection:"column",alignItems:"center",gap:2,textDecoration:"none",padding:"4px 2px",flex:1,color:active?c.text:c.dim,transition:"color 0.15s ease"}}>
+              <div style={{width:28,height:28,display:"flex",alignItems:"center",justifyContent:"center",color:active?c.text:c.dim}}><Icon name={n.iconKey}/></div>
+              <span style={{fontSize:9,fontWeight:active?700:500,color:active?c.text:c.dim,letterSpacing:"0.01em"}}>{n.label}</span>
+              {active&&<div style={{width:4,height:4,borderRadius:"50%",background:c.text,marginTop:-1}}/>}
+            </a>
+          )
+        })}
       </nav>
     </div>
   )
