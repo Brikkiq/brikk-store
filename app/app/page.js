@@ -447,7 +447,7 @@ export default function AppOverview(){
             {leads.filter(l=>l.source==='Referral Link').length} lead{leads.filter(l=>l.source==='Referral Link').length!==1?'s':''} captured from this link
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Quick links */}
       <div style={{display:"flex",gap:8,marginTop:20,flexWrap:"wrap"}}>
