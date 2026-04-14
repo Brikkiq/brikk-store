@@ -85,6 +85,8 @@ Return ONLY the JSON, no other text.`
         'text|sms|message|twilio': `Yes, you can text leads directly from Brikk. Type a message or let AI draft one for you, then send it. Messages are delivered via SMS to your lead's phone number. Full conversation history is saved per lead.`,
         'ai|copilot|artificial intelligence|smart': `Brikk's AI Copilot reads each lead's full context — their temperature, how long since contact, their stage, their notes, and your entire conversation history. It drafts a personalized follow-up message that builds on previous conversations. You just tap approve, edit, or skip. It gets smarter the longer you use it.`,
         'how.*(start|begin|sign|set)|get started|setup': `Just go to brikk.store/login and create your account. Add your first few leads, then click "AI Copilot" to see your first AI-drafted follow-ups. The whole setup takes about 5 minutes.`,
+        'install|download|home screen|add to home|web app|pwa|native|app store': `Great question! You can install Brikk as an app on your phone in seconds. On iPhone: Open brikk.store in Safari, tap the Share button (the square with arrow), scroll down and tap "Add to Home Screen", then tap "Add". On Android: Open brikk.store in Chrome, tap the three dots menu, then tap "Add to Home Screen" or "Install App". It'll show up as a real app on your phone with its own icon — no app store needed! We're also submitting to the Apple App Store soon.`,
+        'how.*install|how.*download|how.*add.*home|how.*get.*app': `Here's how to install Brikk on your phone:\n\niPhone (Safari):\n1. Open brikk.store in Safari\n2. Tap the Share button (square with arrow at the bottom)\n3. Scroll down and tap "Add to Home Screen"\n4. Tap "Add" in the top right\n\nAndroid (Chrome):\n1. Open brikk.store in Chrome\n2. Tap the three dots menu (top right)\n3. Tap "Add to Home Screen" or "Install App"\n4. Tap "Add"\n\nThat's it! Brikk will appear as an app on your home screen with its own icon.`,
       }
 
       // Check fallbacks first
@@ -113,6 +115,7 @@ Key facts:
 - Features: AI Copilot (drafts follow-ups using conversation history), Lead Pipeline (18 fields including pre-approval, timeline, bedrooms, contact preference), Deal Tracker (stage progression, close date countdown), Smart Calendar (auto-populated), Marketing ROI (source analytics), Messages (SMS via Twilio), Voice-to-CRM (speak and AI extracts lead info), Lead Capture Link (/refer)
 - Competitors charge $300-500/month. Brikk is simpler, cheaper, and the AI actually acts.
 - Works on iPhone, Android, desktop. iOS app coming to App Store.
+- HOW TO INSTALL AS APP: iPhone — open brikk.store in Safari, tap Share button (square with arrow), tap "Add to Home Screen", tap Add. Android — open brikk.store in Chrome, tap three dots menu, tap "Add to Home Screen" or "Install App". It appears as a real app with its own icon.
 - Data secured with row-level security. Never sold. Privacy policy at brikk.store/privacy.
 - No contracts, cancel anytime.
 - Built by a small team passionate about helping agents close more deals.

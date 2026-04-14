@@ -145,7 +145,7 @@ export default function Home(){
   const [openFaq,setOpenFaq]=useState(null)
   const [chatOpen,setChatOpen]=useState(false)
   const [chatMsg,setChatMsg]=useState("")
-  const [chatHistory,setChatHistory]=useState([{role:'assistant',content:"Hey! I'm Brikk's AI assistant. Ask me anything about the product — pricing, features, how it works, whatever you need."}])
+  const [chatHistory,setChatHistory]=useState([{role:'assistant',content:"Hey! I'm Brikk's AI assistant. Ask me anything — pricing, features, how to install the app on your phone, or how it all works. I'm here to help!"}])
   const [chatLoading,setChatLoading]=useState(false)
   const handleSubmit=()=>{if(email.includes("@"))setSubmitted(true)}
 
@@ -395,6 +395,16 @@ export default function Home(){
         </div>
       </section>
 
+      {/* AI Help Banner */}
+      <section style={{padding:"32px 20px",textAlign:"center",borderTop:`1px solid ${c.border}`,background:c.white}}>
+        <div style={{maxWidth:480,margin:"0 auto"}}>
+          <div style={{fontSize:16,fontWeight:700,marginBottom:6}}>Have questions?</div>
+          <div style={{fontSize:14,color:c.sub,marginBottom:16}}>Our AI assistant knows everything about Brikk — features, pricing, how to install, and more.</div>
+          <button onClick={()=>setChatOpen(true)} style={{background:c.text,border:"none",borderRadius:10,padding:"14px 32px",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Ask AI About Brikk</button>
+          <div style={{fontSize:12,color:c.dim,marginTop:10}}>Try: "How do I install the app?" or "What features do I get?"</div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer style={{borderTop:`1px solid ${c.border}`,padding:"24px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",maxWidth:1120,margin:"0 auto",flexWrap:"wrap",gap:8}}>
         <span style={{fontSize:14,fontWeight:700}}>Brikk</span>
@@ -408,9 +418,14 @@ export default function Home(){
       </footer>
 
       {/* AI Help Chat Widget */}
-      {!chatOpen&&<button onClick={()=>setChatOpen(true)} style={{position:"fixed",bottom:24,right:24,width:56,height:56,borderRadius:"50%",background:c.text,border:"none",boxShadow:"0 4px 20px rgba(0,0,0,0.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",zIndex:100}}>
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-      </button>}
+      {!chatOpen&&<div style={{position:"fixed",bottom:24,right:24,zIndex:100,display:"flex",alignItems:"center",gap:10}}>
+        <div onClick={()=>setChatOpen(true)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:20,padding:"8px 16px",boxShadow:"0 2px 12px rgba(0,0,0,0.08)",cursor:"pointer",animation:"slideUp 0.4s ease-out 1s both"}}>
+          <span style={{fontSize:12,fontWeight:600,color:c.text}}>Ask AI about Brikk</span>
+        </div>
+        <button onClick={()=>setChatOpen(true)} style={{width:56,height:56,borderRadius:"50%",background:c.text,border:"none",boxShadow:"0 4px 20px rgba(0,0,0,0.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </button>
+      </div>}
 
       {chatOpen&&<div className="scale-in" style={{position:"fixed",bottom:24,right:24,width:360,maxWidth:"calc(100vw - 32px)",height:480,maxHeight:"calc(100vh - 48px)",background:c.white,border:`1px solid ${c.border}`,borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.12)",display:"flex",flexDirection:"column",zIndex:100,overflow:"hidden"}}>
         <div style={{padding:"16px 20px",borderBottom:`1px solid ${c.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
