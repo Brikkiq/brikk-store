@@ -39,8 +39,6 @@ export async function POST(request) {
         'subscription_data[trial_period_days]': '45',
         'line_items[0][price]': prices.monthly,
         'line_items[0][quantity]': '1',
-        'invoice_creation[enabled]': 'true',
-        // Add one-time setup fee as a separate line item
         'line_items[1][price]': prices.setup,
         'line_items[1][quantity]': '1',
         'payment_method_types[0]': 'card',
