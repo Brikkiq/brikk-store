@@ -50,9 +50,9 @@ export default function SettingsPage(){
     if(darkMode)document.documentElement.classList.add('brikk-dark')
     else document.documentElement.classList.remove('brikk-dark')
 
-    // Brightness — class based so it doesn't conflict with dark mode filter
+    // Brightness — class based
     document.documentElement.classList.remove('brikk-dim-90','brikk-dim-80','brikk-dim-70','brikk-dim-60','brikk-dim-50')
-    document.documentElement.style.filter=''
+    document.documentElement.style.removeProperty('filter')
     if(brightness<=55)document.documentElement.classList.add('brikk-dim-50')
     else if(brightness<=65)document.documentElement.classList.add('brikk-dim-60')
     else if(brightness<=75)document.documentElement.classList.add('brikk-dim-70')
