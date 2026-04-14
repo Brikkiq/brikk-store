@@ -245,17 +245,73 @@ export default function SettingsPage(){
           </div>
         </div>}
 
-        {activeTab==='billing'&&<div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"28px 20px",textAlign:"center"}}>
-          <div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:12,padding:"20px",marginBottom:24}}>
-            <div style={{fontSize:20,fontWeight:700,color:c.green}}>Free Trial Active</div>
-            <div style={{fontSize:13,color:c.sub,marginTop:6}}>Full access for 45 days</div>
+        {activeTab==='billing'&&<div>
+          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px",marginBottom:16}}>
+            <div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:12,padding:"20px",marginBottom:24,textAlign:"center"}}>
+              <div style={{fontSize:20,fontWeight:700,color:c.green}}>Free Trial Active</div>
+              <div style={{fontSize:13,color:c.sub,marginTop:6}}>Full access to all features for 45 days</div>
+            </div>
+            <div style={{fontSize:13,color:c.sub,lineHeight:1.7,marginBottom:20,textAlign:"center"}}>Choose a plan to continue after your trial. You won't be charged until your trial ends.</div>
           </div>
-          <div style={{background:c.bg,border:`2px dashed ${c.border}`,borderRadius:16,padding:"48px 20px",marginBottom:20}}>
-            <div style={{fontSize:15,fontWeight:600,color:c.sub}}>No payment method added</div>
-            <div style={{fontSize:12,color:c.dim,marginTop:8}}>Credit cards, debit, Klarna, Apple Pay accepted</div>
+
+          {/* Pro Plan */}
+          <div style={{background:c.white,border:`2px solid ${c.text}`,borderRadius:16,padding:"28px 20px",marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:700}}>Pro</div>
+                <div style={{fontSize:13,color:c.sub,marginTop:2}}>For solo agents</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:28,fontWeight:700}}>$75<span style={{fontSize:14,fontWeight:400,color:c.dim}}>/mo</span></div>
+                <div style={{fontSize:11,color:c.dim}}>+ $125 one-time setup</div>
+              </div>
+            </div>
+            <div style={{fontSize:12,color:c.sub,margin:"16px 0",lineHeight:1.7}}>Everything in Brikk — AI Copilot, Lead Pipeline, Deal Tracker, Smart Calendar, Marketing ROI, Messages, Voice-to-CRM, and Lead Capture Link.</div>
+            <button onClick={async()=>{
+              setSaving(true)
+              try{
+                const res=await fetch('/api/stripe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:'pro',email:user?.email,userId:user?.id})})
+                const data=await res.json()
+                if(data.url)window.location.href=data.url
+                else showToast(data.error||'Something went wrong','error')
+              }catch(e){showToast('Failed to start checkout','error')}
+              setSaving(false)
+            }} disabled={saving} style={{width:"100%",background:c.text,border:"none",borderRadius:12,padding:"16px",fontSize:15,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
+              {saving?'Loading...':'Subscribe to Pro — $75/mo'}
+            </button>
           </div>
-          <button style={{width:"100%",background:c.text,border:"none",borderRadius:12,padding:"16px",fontSize:15,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Add Payment Method</button>
-          <div style={{display:"flex",justifyContent:"center",gap:10,marginTop:16,flexWrap:"wrap"}}>{['Visa','Mastercard','Amex','Klarna','Apple Pay'].map(p=>(<span key={p} style={{fontSize:10,color:c.dim,background:c.bg,borderRadius:6,padding:"4px 8px",border:`1px solid ${c.borderLight}`}}>{p}</span>))}</div>
+
+          {/* Team Plan */}
+          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"28px 20px",marginBottom:16}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+              <div>
+                <div style={{fontSize:18,fontWeight:700}}>Team</div>
+                <div style={{fontSize:13,color:c.sub,marginTop:2}}>Up to 5 agents</div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:28,fontWeight:700}}>$200<span style={{fontSize:14,fontWeight:400,color:c.dim}}>/mo</span></div>
+                <div style={{fontSize:11,color:c.dim}}>+ $125 one-time setup</div>
+              </div>
+            </div>
+            <div style={{fontSize:12,color:c.sub,margin:"16px 0",lineHeight:1.7}}>Everything in Pro plus up to 5 agent seats, team dashboard, lead routing, and priority support.</div>
+            <button onClick={async()=>{
+              setSaving(true)
+              try{
+                const res=await fetch('/api/stripe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:'team',email:user?.email,userId:user?.id})})
+                const data=await res.json()
+                if(data.url)window.location.href=data.url
+                else showToast(data.error||'Something went wrong','error')
+              }catch(e){showToast('Failed to start checkout','error')}
+              setSaving(false)
+            }} disabled={saving} style={{width:"100%",background:c.bg,border:`1px solid ${c.border}`,borderRadius:12,padding:"16px",fontSize:15,fontWeight:600,color:c.text,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
+              {saving?'Loading...':'Subscribe to Team — $200/mo'}
+            </button>
+          </div>
+
+          <div style={{textAlign:"center",padding:"12px 0"}}>
+            <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>{['Visa','Mastercard','Amex','Apple Pay','Google Pay','Klarna'].map(p=>(<span key={p} style={{fontSize:10,color:c.dim,background:c.bg,borderRadius:6,padding:"4px 8px",border:`1px solid ${c.borderLight}`}}>{p}</span>))}</div>
+            <div style={{fontSize:11,color:c.dim,marginTop:10}}>Payments secured by Stripe. 45-day free trial included. Cancel anytime.</div>
+          </div>
         </div>}
 
         {activeTab==='referral'&&<div>
