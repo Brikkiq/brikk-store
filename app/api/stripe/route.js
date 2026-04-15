@@ -4,12 +4,12 @@ const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY
 
 const PRICES = {
   pro: {
-    monthly: 'price_1TMAOF2MsBrmQDSsosNK9PDd',
-    setup: 'price_1TMAOY2MsBrmQDSssZerYEDF'
-  },
-  team: {
     monthly: 'price_1TMALg2MsBrmQDSseFz1jgY4',
     setup: 'price_1TMAN52MsBrmQDSs6JLxHq2q'
+  },
+  team: {
+    monthly: 'price_1TMAOF2MsBrmQDSsosNK9PDd',
+    setup: 'price_1TMAOY2MsBrmQDSssZerYEDF'
   }
 }
 
