@@ -14,6 +14,16 @@ const navItems = [
   { label: 'Marketing', href: '/app/marketing', key: 'marketing' },
 ]
 
+// Mobile bottom-bar tabs. Calendar and Marketing are reachable from the Today dashboard.
+const mobileNavItems = [
+  { label: 'Today',    href: '/app',           key: 'home' },
+  { label: 'Copilot',  href: '/app/copilot',   key: 'copilot' },
+  { label: 'Leads',    href: '/app/leads',     key: 'leads' },
+  { label: 'Deals',    href: '/app/deals',     key: 'deals' },
+  { label: 'Messages', href: '/app/messages',  key: 'messages' },
+  { label: 'Settings', href: '/app/settings',  key: 'settings' },
+]
+
 const Icon = ({ name, size = 18 }) => {
   const props = {
     width: size,
@@ -274,7 +284,7 @@ export default function AppLayout({ children }) {
         style={{
           display: 'none',
           position: 'sticky', top: 0, zIndex: 40,
-          alignItems: 'center', justifyContent: 'space-between',
+          alignItems: 'center', justifyContent: 'center',
           padding: '12px 16px',
           background: 'rgba(255,255,255,0.9)',
           backdropFilter: 'blur(12px)',
@@ -284,18 +294,6 @@ export default function AppLayout({ children }) {
         }}
       >
         <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.025em' }}>Brikk</div>
-        <a
-          href="/app/settings"
-          aria-label="Settings"
-          style={{
-            width: 34, height: 34, borderRadius: 6,
-            background: c.bgInset, border: `1px solid ${c.border}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: c.sub, textDecoration: 'none',
-          }}
-        >
-          <Icon name="settings" size={16} />
-        </a>
       </header>
 
       {/* Main */}
@@ -369,7 +367,7 @@ export default function AppLayout({ children }) {
           alignItems: 'center',
         }}
       >
-        {navItems.slice(0, 5).map(n => {
+        {mobileNavItems.map(n => {
           const active = currentPath === n.href
           return (
             <a
@@ -380,14 +378,23 @@ export default function AppLayout({ children }) {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 3,
-                padding: '6px 2px',
+                gap: 2,
+                padding: '6px 0',
                 textDecoration: 'none',
                 color: active ? c.text : c.dim,
+                minWidth: 0,
               }}
             >
-              <Icon name={n.key} size={20} />
-              <span style={{ fontSize: 10, fontWeight: active ? 600 : 500, letterSpacing: '0.01em' }}>
+              <Icon name={n.key} size={18} />
+              <span style={{
+                fontSize: 9.5,
+                fontWeight: active ? 600 : 500,
+                letterSpacing: '0.005em',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
+              }}>
                 {n.label}
               </span>
             </a>

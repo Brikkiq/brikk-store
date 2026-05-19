@@ -295,11 +295,12 @@ export default function AppOverview() {
       {/* Quick links */}
       <section>
         <SectionHeader label="Jump to" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
-          <QuickLink href="/app/leads"     label="Add a lead"        sub="Capture a new prospect" />
-          <QuickLink href="/app/deals"     label="Log a deal"        sub="Under contract" />
-          <QuickLink href="/app/copilot"   label="Generate drafts"   sub="AI follow-ups" />
-          <QuickLink href="/app/calendar"  label="Smart calendar"    sub="Today + upcoming" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
+          <QuickLink href="/app/copilot"   label="Copilot"      sub="AI follow-ups" />
+          <QuickLink href="/app/calendar"  label="Calendar"     sub="Today + upcoming" />
+          <QuickLink href="/app/marketing" label="Marketing"    sub="ROI by source" />
+          <QuickLink href="/app/leads"     label="Add a lead"   sub="Capture a prospect" />
+          <QuickLink href="/app/deals"     label="Log a deal"   sub="Under contract" />
         </div>
       </section>
 
