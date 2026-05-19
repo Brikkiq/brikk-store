@@ -2,283 +2,288 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { c, type, card, btn, statTile, chipFor, fmt } from '@/lib/design'
 
-const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",green:"#16803C",greenSoft:"rgba(22,128,60,0.06)",greenBorder:"rgba(22,128,60,0.15)",amber:"#A16207",amberSoft:"rgba(161,98,7,0.06)",amberBorder:"rgba(161,98,7,0.15)",red:"#BE123C",redSoft:"rgba(190,18,60,0.06)",redBorder:"rgba(190,18,60,0.12)",purple:"#6D28D9",purpleSoft:"rgba(109,40,217,0.05)",purpleBorder:"rgba(109,40,217,0.12)"}
+export default function CopilotPage() {
+  const [leads, setLeads] = useState([])
+  const [drafts, setDrafts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [approvedIds, setApprovedIds] = useState([])
+  const [skippedIds, setSkippedIds] = useState([])
+  const [editingId, setEditingId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [toast, setToast] = useState(null)
+  const [profile, setProfile] = useState(null)
 
-const Tag=({children,bg,color,border})=><span style={{fontSize:10,fontWeight:600,padding:"2px 8px",borderRadius:4,background:bg,color,border:border?`1px solid ${border}`:"none"}}>{children}</span>
+  const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000) }
 
-export default function CopilotPage(){
-  const [leads,setLeads]=useState([])
-  const [drafts,setDrafts]=useState([])
-  const [loading,setLoading]=useState(true)
-  const [generating,setGenerating]=useState(false)
-  const [approvedIds,setApprovedIds]=useState([])
-  const [skippedIds,setSkippedIds]=useState([])
-  const [editingId,setEditingId]=useState(null)
-  const [editText,setEditText]=useState('')
-  const [toast,setToast]=useState(null)
+  useEffect(() => { loadData() }, [])
 
-  const showToast=(msg)=>{setToast(msg);setTimeout(()=>setToast(null),3000)}
-  const [profile,setProfile]=useState(null)
-  const [stats,setStats]=useState({sent:0,approved:0})
-
-  useEffect(()=>{loadData()},[])
-
-  const loadData=async()=>{
-    const {data:{user}}=await supabase.auth.getUser()
-    if(!user)return
-
-    const [leadsRes,profileRes]=await Promise.all([
-      supabase.from('leads').select('*').order('last_contact_date',{ascending:true}),
-      supabase.from('profiles').select('*').eq('id',user.id).single()
+  const loadData = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const [leadsRes, profileRes] = await Promise.all([
+      supabase.from('leads').select('*').eq('user_id', user.id).order('last_contact_date', { ascending: true }),
+      supabase.from('profiles').select('*').eq('id', user.id).single(),
     ])
-
-    const allLeads=(leadsRes.data||[]).map(l=>({
+    const allLeads = (leadsRes.data || []).map(l => ({
       ...l,
-      days_since_contact:Math.floor((new Date()-new Date(l.last_contact_date))/(1000*60*60*24))
+      days_since_contact: fmt.daysSince(l.last_contact_date) ?? 0,
     }))
-
     setLeads(allLeads)
     setProfile(profileRes.data)
     setLoading(false)
   }
 
-  const generateDrafts=async()=>{
+  const needsFollowUp = (l) => {
+    const d = l.days_since_contact
+    return (l.temperature === 'hot' && d >= 1) ||
+           (l.temperature === 'warm' && d >= 3) ||
+           (l.temperature === 'cold' && d >= 7)
+  }
+
+  const generateDrafts = async () => {
     setGenerating(true)
-    const needsFollowUp=leads.filter(l=>{
-      const d=l.days_since_contact
-      return(l.temperature==='hot'&&d>=1)||(l.temperature==='warm'&&d>=3)||(l.temperature==='cold'&&d>=7)
-    }).sort((a,b)=>{
-      const priority={hot:0,warm:1,cold:2}
-      return(priority[a.temperature]||2)-(priority[b.temperature]||2)
+    const candidates = leads.filter(needsFollowUp).sort((a, b) => {
+      const p = { hot: 0, warm: 1, cold: 2 }
+      return (p[a.temperature] || 2) - (p[b.temperature] || 2)
     })
+    if (candidates.length === 0) { setDrafts([]); setGenerating(false); return }
 
-    if(needsFollowUp.length===0){
-      setDrafts([]);setGenerating(false);return
-    }
-
-    // Fetch message history for each lead
-    const leadsWithHistory=await Promise.all(needsFollowUp.map(async(lead)=>{
-      const {data:msgs}=await supabase.from('messages').select('direction,content,created_at').eq('lead_id',lead.id).order('created_at',{ascending:false}).limit(5)
-      const {data:interactions}=await supabase.from('interactions').select('interaction_type,notes,created_at').eq('lead_id',lead.id).order('created_at',{ascending:false}).limit(5)
-      return{...lead,recent_messages:msgs||[],recent_interactions:interactions||[]}
+    const enriched = await Promise.all(candidates.map(async l => {
+      const { data: msgs } = await supabase.from('messages')
+        .select('direction,content,created_at')
+        .eq('lead_id', l.id).order('created_at', { ascending: false }).limit(5)
+      const { data: interactions } = await supabase.from('interactions')
+        .select('interaction_type,notes,created_at')
+        .eq('lead_id', l.id).order('created_at', { ascending: false }).limit(5)
+      return { ...l, recent_messages: msgs || [], recent_interactions: interactions || [] }
     }))
 
-    try{
-      const res=await fetch('/api/copilot',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({leads:leadsWithHistory,agentName:profile?.full_name||'Alex'})
+    try {
+      const res = await fetch('/api/copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leads: enriched, agentName: profile?.full_name || 'Alex' }),
       })
-      const data=await res.json()
-      setDrafts(data.drafts||[])
-    }catch(err){
-      console.error('Failed to generate',err)
+      const data = await res.json()
+      setDrafts(data.drafts || [])
+    } catch (err) {
+      console.error('Generate failed:', err?.message)
+      showToast('Could not generate drafts — please try again')
     }
     setGenerating(false)
   }
 
-  const handleApprove=async(draft)=>{
-    const {data:{user}}=await supabase.auth.getUser()
-    if(!user)return
-
-    // Log interaction
+  const handleApprove = async (draft) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
     await supabase.from('interactions').insert({
-      user_id:user.id,
-      lead_id:draft.lead_id,
-      interaction_type:draft.channel==='Text'?'text':'email',
-      notes:`Copilot draft approved: ${draft.draft}`
+      user_id: user.id, lead_id: draft.lead_id,
+      interaction_type: draft.channel === 'Text' ? 'text' : 'email',
+      notes: `Copilot draft approved: ${draft.draft}`,
     })
-
-    // Update last contact date
     await supabase.from('leads').update({
-      last_contact_date:new Date().toISOString(),
-      updated_at:new Date().toISOString()
-    }).eq('id',draft.lead_id)
-
-    setApprovedIds(p=>[...p,draft.lead_id])
-    setStats(p=>({...p,approved:p.approved+1,sent:p.sent+1}))
-    showToast('Draft approved — contact logged')
-    // Native haptic feedback
-    if(window.brikk?.haptic)window.brikk.haptic('success')
+      last_contact_date: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', draft.lead_id)
+    setApprovedIds(p => [...p, draft.lead_id])
+    showToast('Approved — contact logged')
+    if (window.brikk?.haptic) window.brikk.haptic('success')
   }
 
-  const handleSkip=(leadId)=>{
-    setSkippedIds(p=>[...p,leadId])
+  const handleSkip = (id) => setSkippedIds(p => [...p, id])
+  const handleEdit = (d) => { setEditingId(d.lead_id); setEditText(d.draft) }
+  const handleSaveEdit = (d) => {
+    setDrafts(p => p.map(x => x.lead_id === d.lead_id ? { ...x, draft: editText } : x))
+    setEditingId(null); setEditText('')
   }
 
-  const handleEdit=(draft)=>{
-    setEditingId(draft.lead_id)
-    setEditText(draft.draft)
-  }
+  const pending = drafts.filter(d => !approvedIds.includes(d.lead_id) && !skippedIds.includes(d.lead_id))
+  const eligibleCount = leads.filter(needsFollowUp).length
 
-  const handleSaveEdit=(draft)=>{
-    setDrafts(p=>p.map(d=>d.lead_id===draft.lead_id?{...d,draft:editText}:d))
-    setEditingId(null)
-    setEditText('')
-  }
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: c.dim, fontSize: 13 }}>Loading Copilot…</div>
 
-  const pendingDrafts=drafts.filter(d=>!approvedIds.includes(d.lead_id)&&!skippedIds.includes(d.lead_id))
-  const urgencyStyle={high:{bg:c.redSoft,color:c.red,border:c.redBorder},medium:{bg:c.amberSoft,color:c.amber,border:c.amberBorder},low:{bg:c.borderLight,color:c.dim,border:c.border}}
+  return (
+    <div>
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 80, right: 24, zIndex: 200,
+          background: c.greenSoft, border: `1px solid ${c.greenBorder}`,
+          borderRadius: 6, padding: '10px 16px',
+          fontSize: 13, color: c.green, fontWeight: 500,
+          boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
+        }}>{toast}</div>
+      )}
 
-  if(loading)return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:18,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Loading Copilot...</div><style>{`@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}`}</style></div>
-
-  return(
-    <div className="page-content">
-      {toast&&<div className="toast" style={{position:"fixed",top:80,right:20,zIndex:200,background:"rgba(22,128,60,0.06)",border:"1px solid rgba(22,128,60,0.15)",borderRadius:8,padding:"12px 20px",fontSize:13,fontWeight:600,color:"#16803C",boxShadow:"0 4px 12px rgba(0,0,0,0.08)"}}>{toast}</div>}
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20,flexWrap:"wrap",gap:12}}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: 16, flexWrap: 'wrap', marginBottom: 18 }}>
         <div>
-          <h1 style={{fontSize:22,fontWeight:700,letterSpacing:"-0.01em",margin:"0 0 4px"}}>AI Copilot</h1>
-          <p style={{fontSize:13,color:c.sub,margin:0}}>AI-drafted follow-ups based on your real leads</p>
+          <h1 style={{ ...type.pageTitle, margin: 0 }}>Copilot</h1>
+          <p style={{ ...type.bodySub, margin: '4px 0 0' }}>AI-drafted follow-ups using each lead's full context.</p>
         </div>
-        <button onClick={generateDrafts} disabled={generating||leads.length===0}
-          style={{background:c.text,border:"none",borderRadius:8,padding:"10px 22px",fontSize:13,fontWeight:600,color:"#fff",cursor:generating?"wait":"pointer",opacity:generating?0.7:1,fontFamily:"inherit"}}>
-          {generating?'Generating...':drafts.length>0?'Regenerate Drafts':'Generate Follow-Ups'}
+        <button
+          onClick={generateDrafts}
+          disabled={generating || leads.length === 0}
+          style={{ ...btn.primary, opacity: generating || leads.length === 0 ? 0.5 : 1 }}
+        >
+          {generating ? 'Generating…' : drafts.length > 0 ? 'Regenerate' : 'Generate drafts'}
         </button>
       </div>
 
-      {/* Stats */}
-      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:20}}>
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",flex:"1 1 140px"}}>
-          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:8}}>Leads Needing Follow-Up</div>
-          <div style={{fontSize:22,fontWeight:700,color:leads.filter(l=>(l.temperature==='hot'&&l.days_since_contact>=1)||(l.temperature==='warm'&&l.days_since_contact>=3)||(l.temperature==='cold'&&l.days_since_contact>=7)).length>0?c.red:c.green}}>
-            {leads.filter(l=>(l.temperature==='hot'&&l.days_since_contact>=1)||(l.temperature==='warm'&&l.days_since_contact>=3)||(l.temperature==='cold'&&l.days_since_contact>=7)).length}
-          </div>
-        </div>
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",flex:"1 1 140px"}}>
-          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:8}}>Drafts Pending</div>
-          <div style={{fontSize:22,fontWeight:700,color:c.purple}}>{pendingDrafts.length}</div>
-        </div>
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",flex:"1 1 140px"}}>
-          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:8}}>Approved This Session</div>
-          <div style={{fontSize:22,fontWeight:700,color:c.green}}>{stats.approved}</div>
-        </div>
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"18px 20px",flex:"1 1 140px"}}>
-          <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:8}}>Total Leads</div>
-          <div style={{fontSize:22,fontWeight:700}}>{leads.length}</div>
-        </div>
+      {/* KPIs */}
+      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
+        <KPI label="Need follow-up" value={eligibleCount} accent={eligibleCount > 0 ? c.amber : c.green} />
+        <KPI label="Pending review" value={pending.length} accent={c.purple} />
+        <KPI label="Approved this session" value={approvedIds.length} accent={c.green} />
+        <KPI label="Total leads" value={leads.length} />
       </div>
 
-      {/* No leads state */}
-      {leads.length===0&&(
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"40px",textAlign:"center"}}>
-          <div style={{fontSize:15,fontWeight:600,marginBottom:8}}>Add some leads first</div>
-          <div style={{fontSize:13,color:c.sub,marginBottom:16}}>Copilot needs leads to work with. Add your leads in the Leads tab, then come back here.</div>
-          <a href="/app/leads" style={{fontSize:13,fontWeight:600,color:c.text,textDecoration:"underline"}}>Go to Leads</a>
+      {/* States */}
+      {leads.length === 0 && (
+        <EmptyCard title="Add some leads first" body="Copilot needs leads to work with. Add your current pipeline, then come back.">
+          <a href="/app/leads" style={{ ...btn.primary, textDecoration: 'none' }}>Go to Leads</a>
+        </EmptyCard>
+      )}
+
+      {leads.length > 0 && drafts.length === 0 && !generating && (
+        <EmptyCard
+          title="Ready when you are"
+          body={`Click "Generate drafts" to have AI write personalized follow-ups for ${eligibleCount || 'your'} lead${eligibleCount === 1 ? '' : 's'}.`}
+        />
+      )}
+
+      {generating && (
+        <div style={{ ...card, padding: '32px 20px', textAlign: 'center' }}>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Drafting messages…</div>
+          <div style={{ ...type.bodySub, marginTop: 4 }}>Analyzing context and writing personalized follow-ups. About 10–15 seconds.</div>
         </div>
       )}
 
-      {/* No drafts yet state */}
-      {leads.length>0&&drafts.length===0&&!generating&&(
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"40px",textAlign:"center"}}>
-          <div style={{fontSize:15,fontWeight:600,marginBottom:8}}>Ready to generate</div>
-          <div style={{fontSize:13,color:c.sub,marginBottom:4}}>Click "Generate Follow-Ups" to have AI draft personalized messages for leads that need attention.</div>
-          <div style={{fontSize:12,color:c.dim,marginTop:8}}>Copilot analyzes each lead's temperature, days since contact, source, and notes to write the perfect follow-up.</div>
-        </div>
-      )}
-
-      {/* Generating state */}
-      {generating&&(
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"40px",textAlign:"center"}}>
-          <div style={{fontSize:15,fontWeight:600,marginBottom:8}}>AI is thinking...</div>
-          <div style={{fontSize:13,color:c.sub}}>Analyzing your leads and drafting personalized follow-ups. This takes about 10-15 seconds.</div>
-        </div>
-      )}
-
-      {/* Draft cards */}
-      {pendingDrafts.length>0&&(
-        <div style={{marginBottom:20}}>
-          <div style={{fontSize:11,fontWeight:600,color:c.dim,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:14}}>Pending Your Approval</div>
-          <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            {pendingDrafts.map((d,i)=>{
-              const u=urgencyStyle[d.urgency]||urgencyStyle.low
-              const isEditing=editingId===d.lead_id
-              return(
-                <div key={d.lead_id} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"20px 22px"}}>
-                  {/* Header */}
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12,flexWrap:"wrap",gap:8}}>
-                    <div style={{display:"flex",alignItems:"center",gap:10}}>
-                      <span style={{fontSize:14,fontWeight:700}}>{d.lead_name}</span>
-                      <Tag bg={u.bg} color={u.color} border={u.border}>{d.urgency}</Tag>
-                      <Tag bg={c.purpleSoft} color={c.purple} border={c.purpleBorder}>{d.channel}</Tag>
-                    </div>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:11,color:c.dim}}>{d.lead_type} / {d.source} / {d.stage}</span>
-                      <span style={{fontSize:11,fontWeight:600,color:d.days_since_contact>=5?c.red:d.days_since_contact>=3?c.amber:c.dim}}>{d.days_since_contact}d since contact</span>
-                    </div>
-                  </div>
-
-                  {/* Draft message */}
-                  <div style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:6,padding:"14px 16px",marginBottom:12}}>
-                    <div style={{fontSize:10,fontWeight:600,color:c.dim,textTransform:"uppercase",letterSpacing:"0.04em",marginBottom:6}}>Draft Message</div>
-                    {isEditing?(
-                      <div>
-                        <textarea value={editText} onChange={e=>setEditText(e.target.value)} rows={3}
-                          style={{width:"100%",padding:"10px 12px",borderRadius:6,border:`1px solid ${c.border}`,fontSize:13,color:c.text,background:c.white,outline:"none",fontFamily:"inherit",resize:"vertical",lineHeight:1.7,boxSizing:"border-box"}}/>
-                        <div style={{display:"flex",gap:6,marginTop:8}}>
-                          <button onClick={()=>handleSaveEdit(d)} style={{background:c.text,border:"none",borderRadius:4,padding:"6px 14px",fontSize:11,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Save Edit</button>
-                          <button onClick={()=>setEditingId(null)} style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:4,padding:"6px 14px",fontSize:11,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
-                        </div>
-                      </div>
-                    ):(
-                      <div style={{fontSize:13,color:c.text,lineHeight:1.7}}>{d.draft}</div>
-                    )}
-                  </div>
-
-                  {/* AI reasoning */}
-                  <div style={{background:c.purpleSoft,border:`1px solid ${c.purpleBorder}`,borderRadius:6,padding:"12px 14px",marginBottom:14}}>
-                    <div style={{fontSize:10,fontWeight:600,color:c.purple,marginBottom:3}}>Why This Message, Why Now</div>
-                    <div style={{fontSize:12,color:c.sub,lineHeight:1.6}}>{d.reason}</div>
-                  </div>
-
-                  {/* Actions */}
-                  {!isEditing&&(
-                    <div style={{display:"flex",gap:8}}>
-                      <button onClick={()=>handleApprove(d)}
-                        style={{background:c.green,border:"none",borderRadius:6,padding:"8px 20px",fontSize:12,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>
-                        Approve & Log
-                      </button>
-                      <button onClick={()=>handleEdit(d)}
-                        style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:6,padding:"8px 20px",fontSize:12,fontWeight:500,color:c.sub,cursor:"pointer",fontFamily:"inherit"}}>
-                        Edit
-                      </button>
-                      <button onClick={()=>handleSkip(d.lead_id)}
-                        style={{background:"transparent",border:`1px solid ${c.border}`,borderRadius:6,padding:"8px 20px",fontSize:12,fontWeight:500,color:c.dim,cursor:"pointer",fontFamily:"inherit"}}>
-                        Skip
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+      {/* Pending drafts */}
+      {pending.length > 0 && (
+        <section style={{ marginBottom: 28 }}>
+          <div style={{ ...type.eyebrow, marginBottom: 12 }}>Pending your approval</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {pending.map(d => (
+              <DraftCard
+                key={d.lead_id} draft={d}
+                isEditing={editingId === d.lead_id}
+                editText={editText}
+                setEditText={setEditText}
+                onApprove={() => handleApprove(d)}
+                onSkip={() => handleSkip(d.lead_id)}
+                onEdit={() => handleEdit(d)}
+                onSaveEdit={() => handleSaveEdit(d)}
+                onCancelEdit={() => setEditingId(null)}
+              />
+            ))}
           </div>
-        </div>
+        </section>
       )}
 
-      {/* All approved state */}
-      {drafts.length>0&&pendingDrafts.length===0&&!generating&&(
-        <div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"24px",textAlign:"center"}}>
-          <div style={{fontSize:15,fontWeight:600,color:c.green,marginBottom:4}}>All caught up</div>
-          <div style={{fontSize:13,color:c.sub}}>You've reviewed all drafts. Approved messages have been logged to each lead's history. Click "Regenerate Drafts" to check for new follow-ups.</div>
-        </div>
+      {drafts.length > 0 && pending.length === 0 && !generating && (
+        <EmptyCard title="Inbox zero" body="You've reviewed every draft. Approved messages are logged on each lead." />
       )}
 
       {/* Approved log */}
-      {approvedIds.length>0&&(
-        <div style={{marginTop:20}}>
-          <div style={{fontSize:11,fontWeight:600,color:c.dim,letterSpacing:"0.05em",textTransform:"uppercase",marginBottom:14}}>Approved This Session</div>
-          {drafts.filter(d=>approvedIds.includes(d.lead_id)).map((d,i)=>(
-            <div key={i} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 16px",marginBottom:6}}>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:13,fontWeight:600}}>{d.lead_name}</span>
-                  <Tag bg={c.greenSoft} color={c.green} border={c.greenBorder}>Approved</Tag>
-                  <Tag bg={c.purpleSoft} color={c.purple} border={c.purpleBorder}>{d.channel}</Tag>
+      {approvedIds.length > 0 && (
+        <section>
+          <div style={{ ...type.eyebrow, marginBottom: 12 }}>Approved this session</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {drafts.filter(d => approvedIds.includes(d.lead_id)).map(d => (
+              <div key={d.lead_id} style={{ ...card, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={chipFor('success')}>✓</span>
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>{d.lead_name}</span>
+                  <span style={chipFor('info')}>{d.channel}</span>
                 </div>
-                <span style={{fontSize:11,color:c.dim}}>Contact logged</span>
+                <span style={{ ...type.meta }}>Contact logged</span>
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+const KPI = ({ label, value, accent }) => (
+  <div style={statTile}>
+    <span style={type.eyebrow}>{label}</span>
+    <span style={{ ...type.metric, color: accent || c.text }}>{value}</span>
+  </div>
+)
+
+const EmptyCard = ({ title, body, children }) => (
+  <div style={{ ...card, padding: '36px 24px', textAlign: 'center' }}>
+    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</div>
+    <div style={{ ...type.bodySub, marginBottom: children ? 16 : 0, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}>{body}</div>
+    {children}
+  </div>
+)
+
+const DraftCard = ({ draft, isEditing, editText, setEditText, onApprove, onSkip, onEdit, onSaveEdit, onCancelEdit }) => {
+  const urgencyChip = draft.urgency === 'high' ? chipFor('hot')
+                    : draft.urgency === 'medium' ? chipFor('warm')
+                    : chipFor('neutral')
+  return (
+    <div style={card}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 14, fontWeight: 600 }}>{draft.lead_name}</span>
+          <span style={urgencyChip}>{draft.urgency}</span>
+          <span style={chipFor('info')}>{draft.channel}</span>
+        </div>
+        <div style={{ ...type.meta }}>
+          {[draft.lead_type, draft.source, draft.stage].filter(Boolean).join(' · ')} · {draft.days_since_contact}d since contact
+        </div>
+      </div>
+
+      <div style={{ background: c.bgInset, border: `1px solid ${c.border}`, borderRadius: 6, padding: '12px 14px', marginBottom: 12 }}>
+        <div style={{ ...type.eyebrow, marginBottom: 6 }}>Draft message</div>
+        {isEditing ? (
+          <>
+            <textarea
+              value={editText}
+              onChange={e => setEditText(e.target.value)}
+              rows={3}
+              style={{
+                width: '100%', padding: '10px 12px',
+                borderRadius: 6, border: `1px solid ${c.border}`,
+                fontSize: 13, fontFamily: 'inherit',
+                background: c.white, color: c.text, outline: 'none',
+                resize: 'vertical', lineHeight: 1.6,
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <button onClick={onSaveEdit} style={btn.primary}>Save edit</button>
+              <button onClick={onCancelEdit} style={btn.secondary}>Cancel</button>
             </div>
-          ))}
+          </>
+        ) : (
+          <div style={{ fontSize: 13.5, lineHeight: 1.65, color: c.text }}>{draft.draft}</div>
+        )}
+      </div>
+
+      <div style={{
+        background: c.purpleSoft,
+        borderLeft: `2px solid ${c.purple}`,
+        padding: '10px 12px',
+        borderRadius: 4,
+        marginBottom: 14,
+      }}>
+        <div style={{ ...type.eyebrow, color: c.purple, marginBottom: 3 }}>Why now</div>
+        <div style={{ fontSize: 12.5, color: c.sub, lineHeight: 1.55 }}>{draft.reason}</div>
+      </div>
+
+      {!isEditing && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={onApprove} style={{ ...btn.primary, background: c.green, border: `1px solid ${c.green}` }}>Approve & log</button>
+          <button onClick={onEdit} style={btn.secondary}>Edit</button>
+          <button onClick={onSkip} style={btn.ghost}>Skip</button>
         </div>
       )}
     </div>

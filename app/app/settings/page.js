@@ -2,357 +2,593 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { c, type, card, btn, input, inputLabel } from '@/lib/design'
 
-const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",green:"#16803C",greenSoft:"rgba(22,128,60,0.06)",greenBorder:"rgba(22,128,60,0.15)",red:"#BE123C",redSoft:"rgba(190,18,60,0.06)"}
+const TABS = [
+  { id: 'profile',    label: 'Profile' },
+  { id: 'appearance', label: 'Appearance' },
+  { id: 'billing',    label: 'Billing' },
+  { id: 'referral',   label: 'Lead capture link' },
+  { id: 'privacy',    label: 'Privacy' },
+  { id: 'agreement',  label: 'Legal' },
+]
 
-export default function SettingsPage(){
-  const [user,setUser]=useState(null)
-  const [profile,setProfile]=useState(null)
-  const [loading,setLoading]=useState(true)
-  const [activeTab,setActiveTab]=useState(null)
-  const [toast,setToast]=useState(null)
-  const [saving,setSaving]=useState(false)
-  const [editName,setEditName]=useState('')
-  const [editPhone,setEditPhone]=useState('')
-  const [editBrokerage,setEditBrokerage]=useState('')
-  const [profilePic,setProfilePic]=useState(null)
-  const [oldPassword,setOldPassword]=useState('')
-  const [newPassword,setNewPassword]=useState('')
-  const [confirmPassword,setConfirmPassword]=useState('')
-  const [darkMode,setDarkMode]=useState(false)
-  const [blueLight,setBlueLight]=useState(0)
-  const [brightness,setBrightness]=useState(100)
-  const [textSize,setTextSize]=useState('medium')
-  const fileInputRef=useRef(null)
+export default function SettingsPage() {
+  const [user, setUser] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('profile')
+  const [toast, setToast] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editBrokerage, setEditBrokerage] = useState('')
+  const [profilePic, setProfilePic] = useState(null)
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [darkMode, setDarkMode] = useState(false)
+  const [brightness, setBrightness] = useState(100)
+  const [blueLight, setBlueLight] = useState(0)
+  const [textSize, setTextSize] = useState('medium')
+  const fileInputRef = useRef(null)
 
-  const showToast=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),3000)}
+  const showToast = (msg, kind = 'success') => {
+    setToast({ msg, kind })
+    setTimeout(() => setToast(null), 3000)
+  }
 
-  useEffect(()=>{
+  useEffect(() => {
     loadProfile()
-    if(typeof window!=='undefined'){
-      try{
-        const saved=JSON.parse(localStorage.getItem('brikk-appearance')||'{}')
-        if(saved.darkMode!==undefined)setDarkMode(saved.darkMode)
-        if(saved.blueLight!==undefined)setBlueLight(saved.blueLight)
-        if(saved.brightness!==undefined)setBrightness(saved.brightness)
-        if(saved.textSize)setTextSize(saved.textSize)
-        const pic=localStorage.getItem('brikk-profile-pic')
-        if(pic)setProfilePic(pic)
-      }catch(e){}
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(localStorage.getItem('brikk-appearance') || '{}')
+        if (saved.darkMode !== undefined) setDarkMode(saved.darkMode)
+        if (saved.blueLight !== undefined) setBlueLight(saved.blueLight)
+        if (saved.brightness !== undefined) setBrightness(saved.brightness)
+        if (saved.textSize) setTextSize(saved.textSize)
+        const pic = localStorage.getItem('brikk-profile-pic')
+        if (pic) setProfilePic(pic)
+      } catch {}
     }
-  },[])
+  }, [])
 
-  useEffect(()=>{
-    if(typeof window==='undefined')return
-    localStorage.setItem('brikk-appearance',JSON.stringify({darkMode,blueLight,brightness,textSize}))
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem('brikk-appearance', JSON.stringify({ darkMode, blueLight, brightness, textSize }))
 
-    // Dark mode — filter invert
-    if(darkMode)document.documentElement.classList.add('brikk-dark')
-    else document.documentElement.classList.remove('brikk-dark')
+    const html = document.documentElement
+    if (darkMode) html.classList.add('brikk-dark')
+    else html.classList.remove('brikk-dark')
 
-    // Brightness — class based
-    document.documentElement.classList.remove('brikk-dim-90','brikk-dim-80','brikk-dim-70','brikk-dim-60','brikk-dim-50')
-    document.documentElement.style.removeProperty('filter')
-    if(brightness<=55)document.documentElement.classList.add('brikk-dim-50')
-    else if(brightness<=65)document.documentElement.classList.add('brikk-dim-60')
-    else if(brightness<=75)document.documentElement.classList.add('brikk-dim-70')
-    else if(brightness<=85)document.documentElement.classList.add('brikk-dim-80')
-    else if(brightness<=95)document.documentElement.classList.add('brikk-dim-90')
+    html.classList.remove('brikk-dim-90', 'brikk-dim-80', 'brikk-dim-70', 'brikk-dim-60', 'brikk-dim-50')
+    if (brightness <= 55) html.classList.add('brikk-dim-50')
+    else if (brightness <= 65) html.classList.add('brikk-dim-60')
+    else if (brightness <= 75) html.classList.add('brikk-dim-70')
+    else if (brightness <= 85) html.classList.add('brikk-dim-80')
+    else if (brightness <= 95) html.classList.add('brikk-dim-90')
 
-    // Blue light
-    let overlay=document.getElementById('brikk-bluelight')
-    if(blueLight>0){
-      if(!overlay){overlay=document.createElement('div');overlay.id='brikk-bluelight';overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:99999;transition:opacity 0.3s ease';document.body.appendChild(overlay)}
-      overlay.style.background=`rgba(255,180,50,${blueLight/100*0.3})`
-    }else if(overlay){overlay.style.background='transparent'}
+    let overlay = document.getElementById('brikk-bluelight')
+    if (blueLight > 0) {
+      if (!overlay) {
+        overlay = document.createElement('div')
+        overlay.id = 'brikk-bluelight'
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;pointer-events:none;z-index:99999;transition:background 0.3s ease'
+        document.body.appendChild(overlay)
+      }
+      overlay.style.background = `rgba(255,180,50,${(blueLight / 100) * 0.3})`
+    } else if (overlay) {
+      overlay.style.background = 'transparent'
+    }
 
-    // Text size — zoom
-    document.documentElement.classList.remove('brikk-text-small','brikk-text-large')
-    if(textSize==='small')document.documentElement.classList.add('brikk-text-small')
-    if(textSize==='large')document.documentElement.classList.add('brikk-text-large')
-  },[darkMode,blueLight,brightness,textSize])
+    html.classList.remove('brikk-text-small', 'brikk-text-large')
+    if (textSize === 'small') html.classList.add('brikk-text-small')
+    if (textSize === 'large') html.classList.add('brikk-text-large')
+  }, [darkMode, blueLight, brightness, textSize])
 
-  const loadProfile=async()=>{
-    const {data:{user}}=await supabase.auth.getUser()
-    if(!user)return
+  const loadProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
     setUser(user)
-    const {data}=await supabase.from('profiles').select('*').eq('id',user.id).single()
-    if(data){setProfile(data);setEditName(data.full_name||'');setEditPhone(data.phone||'');setEditBrokerage(data.brokerage||'')}
+    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    if (data) {
+      setProfile(data)
+      setEditName(data.full_name || '')
+      setEditPhone(data.phone || '')
+      setEditBrokerage(data.brokerage || '')
+    }
     setLoading(false)
   }
 
-  const saveProfile=async()=>{
-    if(!user)return;setSaving(true)
-    await supabase.from('profiles').update({full_name:editName,phone:editPhone,brokerage:editBrokerage}).eq('id',user.id)
-    setSaving(false);showToast('Profile saved')
-    if(window.brikk?.haptic)window.brikk.haptic('success')
+  const saveProfile = async () => {
+    if (!user) return
+    setSaving(true)
+    const { error } = await supabase.from('profiles').update({
+      full_name: editName, phone: editPhone, brokerage: editBrokerage,
+    }).eq('id', user.id)
+    setSaving(false)
+    if (error) showToast(error.message, 'error')
+    else {
+      showToast('Profile saved')
+      if (window.brikk?.haptic) window.brikk.haptic('success')
+    }
   }
 
-  const handleProfilePic=(e)=>{
-    const file=e.target.files?.[0];if(!file)return
-    const reader=new FileReader()
-    reader.onload=(ev)=>{setProfilePic(ev.target.result);localStorage.setItem('brikk-profile-pic',ev.target.result);showToast('Photo updated')}
+  const handleProfilePic = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      setProfilePic(ev.target.result)
+      localStorage.setItem('brikk-profile-pic', ev.target.result)
+      showToast('Photo updated')
+    }
     reader.readAsDataURL(file)
   }
 
-  const changePassword=async()=>{
-    if(!oldPassword){showToast('Enter your current password','error');return}
-    if(!newPassword||newPassword.length<6){showToast('New password must be at least 6 characters','error');return}
-    if(newPassword!==confirmPassword){showToast('Passwords don\'t match','error');return}
+  const changePassword = async () => {
+    if (!oldPassword) return showToast('Enter your current password', 'error')
+    if (!newPassword || newPassword.length < 6) return showToast('New password must be at least 6 characters', 'error')
+    if (newPassword !== confirmPassword) return showToast("Passwords don't match", 'error')
+
     setSaving(true)
-    const {error:signInError}=await supabase.auth.signInWithPassword({email:user.email,password:oldPassword})
-    if(signInError){setSaving(false);showToast('Current password is incorrect','error');return}
-    const {error}=await supabase.auth.updateUser({password:newPassword})
+    // Re-verify current password by attempting a fresh sign-in. This works without
+    // disturbing the current session because we don't replace the session afterward.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: user.email, password: oldPassword,
+    })
+    if (signInError) {
+      setSaving(false)
+      return showToast('Current password is incorrect', 'error')
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
     setSaving(false)
-    if(error)showToast(error.message,'error')
-    else{showToast('Password updated');setOldPassword('');setNewPassword('');setConfirmPassword('')}
+    if (error) showToast(error.message, 'error')
+    else {
+      showToast('Password updated')
+      setOldPassword(''); setNewPassword(''); setConfirmPassword('')
+    }
   }
 
-  const handleLogout=async()=>{await supabase.auth.signOut();window.location.href='/'}
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/'
+  }
 
-  if(loading)return <div style={{padding:40,textAlign:"center"}}><div style={{fontSize:20,fontWeight:700,color:c.text,animation:"pulse 1.2s ease-in-out infinite"}}>Loading...</div><style>{`@keyframes pulse{0%,100%{opacity:0.3}50%{opacity:1}}`}</style></div>
+  if (loading) return <div style={{ padding: 60, textAlign: 'center', color: c.dim, fontSize: 13 }}>Loading…</div>
 
-  const inputStyle={width:"100%",padding:"13px 16px",borderRadius:12,border:`1.5px solid ${c.border}`,fontSize:14,color:c.text,background:c.white,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}
-  const referralLink=`https://brikk.store/refer?agent=${user?.id||''}`
+  const initials = (editName || user?.email || '?').split(' ').filter(Boolean).map(s => s[0]).join('').slice(0, 2).toUpperCase()
+  const referralLink = `https://brikk.store/refer?agent=${user?.id || ''}`
 
-  const tabs=[
-    {id:'profile',label:'Profile'},
-    {id:'appearance',label:'Appearance'},
-    {id:'billing',label:'Billing'},
-    {id:'referral',label:'Lead Capture Link'},
-    {id:'privacy',label:'Privacy'},
-    {id:'agreement',label:'User Agreement'},
-  ]
+  return (
+    <div>
+      {toast && (
+        <div style={{
+          position: 'fixed', top: 80, right: 24, zIndex: 200,
+          background: toast.kind === 'error' ? c.redSoft : c.greenSoft,
+          border: `1px solid ${toast.kind === 'error' ? c.redBorder : c.greenBorder}`,
+          color: toast.kind === 'error' ? c.red : c.green,
+          borderRadius: 6, padding: '10px 16px',
+          fontSize: 13, fontWeight: 500,
+          boxShadow: '0 6px 20px rgba(0,0,0,0.08)',
+        }}>{toast.msg}</div>
+      )}
 
-  // Wheel menu
-  if(!activeTab)return(
-    <div style={{position:"fixed",inset:0,background:c.bg,zIndex:200,display:"flex",flexDirection:"column",fontFamily:"'Instrument Sans',-apple-system,sans-serif",overflow:"hidden"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-      {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",zIndex:300,background:toast.type==='error'?c.redSoft:c.greenSoft,border:`1px solid ${toast.type==='error'?'rgba(190,18,60,0.15)':c.greenBorder}`,borderRadius:12,padding:"12px 24px",fontSize:13,fontWeight:600,color:toast.type==='error'?c.red:c.green,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>{toast.msg}</div>}
-
-      <div style={{padding:"20px 24px",display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
-        <h1 style={{fontSize:24,fontWeight:700,margin:0,letterSpacing:"-0.02em"}}>Settings</h1>
-        <a href="/app" style={{width:36,height:36,borderRadius:12,background:c.bg,border:`1px solid ${c.border}`,display:"flex",alignItems:"center",justifyContent:"center",textDecoration:"none",fontSize:16,color:c.dim}}>×</a>
+      <div style={{ marginBottom: 18 }}>
+        <h1 style={{ ...type.pageTitle, margin: 0 }}>Settings</h1>
+        <p style={{ ...type.bodySub, margin: '4px 0 0' }}>{user?.email}</p>
       </div>
 
-      <div style={{padding:"0 24px 20px",flexShrink:0}}>
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"20px",display:"flex",alignItems:"center",gap:16}}>
-          <div onClick={()=>fileInputRef.current?.click()} style={{width:56,height:56,borderRadius:16,background:profilePic?'transparent':c.bg,border:`2px solid ${c.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden",flexShrink:0}}>
-            {profilePic?<img src={profilePic} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:<span style={{fontSize:18,fontWeight:700,color:c.text}}>{editName?editName.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase():'?'}</span>}
-          </div>
-          <input type="file" ref={fileInputRef} onChange={handleProfilePic} accept="image/*" style={{display:"none"}}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontSize:16,fontWeight:700}}>{editName||'No name'}</div>
-            <div style={{fontSize:12,color:c.dim,marginTop:2}}>{user?.email}</div>
+      <style>{`
+        .brikk-settings-layout { display: block; }
+        .brikk-settings-nav { display: none; }
+        .brikk-settings-mobile-list { display: block; }
+        @media (min-width: 901px) {
+          .brikk-settings-layout { display: grid !important; grid-template-columns: 200px 1fr !important; gap: 24px !important; }
+          .brikk-settings-nav { display: flex !important; flex-direction: column !important; }
+          .brikk-settings-mobile-list { display: none !important; }
+        }
+      `}</style>
+
+      <div className="brikk-settings-layout">
+        {/* Sidebar nav (desktop) */}
+        <nav className="brikk-settings-nav" style={{ display: 'none', flexDirection: 'column', gap: 2 }}>
+          {TABS.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              style={{
+                background: activeTab === t.id ? c.white : 'transparent',
+                border: `1px solid ${activeTab === t.id ? c.border : 'transparent'}`,
+                borderRadius: 6,
+                padding: '9px 12px',
+                fontSize: 13,
+                fontWeight: activeTab === t.id ? 600 : 500,
+                color: activeTab === t.id ? c.text : c.sub,
+                textAlign: 'left',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'background 0.12s ease, color 0.12s ease',
+              }}
+            >{t.label}</button>
+          ))}
+          <button
+            onClick={handleLogout}
+            style={{
+              marginTop: 12, background: 'transparent',
+              border: `1px solid ${c.redBorder}`,
+              borderRadius: 6,
+              padding: '9px 12px',
+              fontSize: 13, fontWeight: 500, color: c.red,
+              textAlign: 'left', cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >Sign out</button>
+        </nav>
+
+        {/* Content */}
+        <div>
+          {activeTab === 'profile' && (
+            <ProfileTab
+              user={user}
+              editName={editName} setEditName={setEditName}
+              editPhone={editPhone} setEditPhone={setEditPhone}
+              editBrokerage={editBrokerage} setEditBrokerage={setEditBrokerage}
+              profilePic={profilePic}
+              initials={initials}
+              fileInputRef={fileInputRef}
+              onPic={handleProfilePic}
+              onSave={saveProfile}
+              saving={saving}
+              oldPassword={oldPassword} setOldPassword={setOldPassword}
+              newPassword={newPassword} setNewPassword={setNewPassword}
+              confirmPassword={confirmPassword} setConfirmPassword={setConfirmPassword}
+              onChangePassword={changePassword}
+            />
+          )}
+
+          {activeTab === 'appearance' && (
+            <AppearanceTab
+              darkMode={darkMode} setDarkMode={setDarkMode}
+              brightness={brightness} setBrightness={setBrightness}
+              blueLight={blueLight} setBlueLight={setBlueLight}
+              textSize={textSize} setTextSize={setTextSize}
+            />
+          )}
+
+          {activeTab === 'billing' && <BillingTab user={user} saving={saving} setSaving={setSaving} showToast={showToast} />}
+          {activeTab === 'referral' && <ReferralTab referralLink={referralLink} showToast={showToast} />}
+          {activeTab === 'privacy' && <PrivacyTab />}
+          {activeTab === 'agreement' && <AgreementTab />}
+
+          {/* Mobile sign out */}
+          <div style={{ marginTop: 24, display: 'block' }} className="brikk-settings-mobile-list">
+            <button
+              onClick={handleLogout}
+              style={{ ...btn.danger, width: '100%' }}
+            >Sign out</button>
+            <div style={{ textAlign: 'center', marginTop: 12, color: c.dim, fontSize: 11 }}>Brikk v1.3</div>
           </div>
         </div>
-      </div>
-
-      <div style={{flex:1,padding:"0 24px",overflow:"auto"}}>
-        {tabs.map(t=>(
-          <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",background:c.white,border:`1px solid ${c.border}`,borderRadius:14,padding:"18px 20px",marginBottom:8,cursor:"pointer",fontFamily:"inherit"}}>
-            <span style={{fontSize:15,fontWeight:600,color:c.text}}>{t.label}</span>
-            <span style={{fontSize:18,color:c.dim}}>›</span>
-          </button>
-        ))}
-      </div>
-
-      <div style={{padding:"16px 24px calc(16px + env(safe-area-inset-bottom, 0px))",flexShrink:0}}>
-        <button onClick={handleLogout} style={{width:"100%",background:c.white,border:`1px solid rgba(190,18,60,0.2)`,borderRadius:14,padding:"16px",fontSize:14,fontWeight:600,color:c.red,cursor:"pointer",fontFamily:"inherit"}}>Sign Out</button>
-        <div style={{textAlign:"center",marginTop:10}}><span style={{fontSize:11,color:c.dim}}>Brikk v1.2</span></div>
-      </div>
-    </div>
-  )
-
-  // Tab content
-  return(
-    <div style={{position:"fixed",inset:0,background:c.bg,zIndex:200,display:"flex",flexDirection:"column",fontFamily:"'Instrument Sans',-apple-system,sans-serif",overflow:"hidden"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-      {toast&&<div style={{position:"fixed",top:20,left:"50%",transform:"translateX(-50%)",zIndex:300,background:toast.type==='error'?c.redSoft:c.greenSoft,border:`1px solid ${toast.type==='error'?'rgba(190,18,60,0.15)':c.greenBorder}`,borderRadius:12,padding:"12px 24px",fontSize:13,fontWeight:600,color:toast.type==='error'?c.red:c.green,boxShadow:"0 4px 20px rgba(0,0,0,0.08)"}}>{toast.msg}</div>}
-
-      <div style={{padding:"16px 24px",display:"flex",alignItems:"center",gap:12,borderBottom:`1px solid ${c.border}`,flexShrink:0}}>
-        <button onClick={()=>setActiveTab(null)} style={{width:36,height:36,borderRadius:12,background:c.bg,border:`1px solid ${c.border}`,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:c.text,fontFamily:"inherit"}}>‹</button>
-        <span style={{fontSize:17,fontWeight:700}}>{tabs.find(t=>t.id===activeTab)?.label}</span>
-      </div>
-
-      <div style={{flex:1,overflow:"auto",padding:"20px 24px calc(20px + env(safe-area-inset-bottom, 0px))"}}>
-
-        {activeTab==='profile'&&<>
-          <div style={{textAlign:"center",marginBottom:24}}>
-            <div onClick={()=>fileInputRef.current?.click()} style={{width:80,height:80,borderRadius:24,background:profilePic?'transparent':c.bg,border:`2px solid ${c.border}`,display:"inline-flex",alignItems:"center",justifyContent:"center",cursor:"pointer",overflow:"hidden"}}>
-              {profilePic?<img src={profilePic} style={{width:"100%",height:"100%",objectFit:"cover"}} alt=""/>:<span style={{fontSize:28,fontWeight:700,color:c.text}}>{editName?editName.split(' ').map(n=>n[0]).join('').slice(0,2).toUpperCase():'?'}</span>}
-            </div>
-            <input type="file" ref={fileInputRef} onChange={handleProfilePic} accept="image/*" style={{display:"none"}}/>
-            <div style={{fontSize:12,color:c.dim,marginTop:8}}>Tap to change photo</div>
-          </div>
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px",marginBottom:16}}>
-            <div style={{display:"grid",gap:16}}>
-              <div><label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Full Name</label><input value={editName} onChange={e=>setEditName(e.target.value)} style={inputStyle}/></div>
-              <div><label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Email</label><div style={{...inputStyle,background:c.bg,color:c.dim}}>{user?.email}</div></div>
-              <div><label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Phone</label><input value={editPhone} onChange={e=>setEditPhone(e.target.value)} placeholder="(801) 555-0142" style={inputStyle}/></div>
-              <div><label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Brokerage</label><input value={editBrokerage} onChange={e=>setEditBrokerage(e.target.value)} placeholder="Keller Williams, eXp, etc." style={inputStyle}/></div>
-            </div>
-            <button onClick={saveProfile} disabled={saving} style={{marginTop:20,width:"100%",background:c.text,border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?'Saving...':'Save Changes'}</button>
-          </div>
-
-          {/* Lead Capture Link */}
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px",marginBottom:16}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Your Lead Capture Link</div>
-            <div style={{fontSize:12,color:c.dim,marginBottom:16}}>Share this on business cards, Instagram, or email signatures. Leads go straight to your pipeline.</div>
-            <div style={{background:c.bg,border:`1px solid ${c.borderLight}`,borderRadius:10,padding:"12px 14px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10,marginBottom:12}}>
-              <code style={{fontSize:13,color:c.text,fontFamily:"inherit",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>brikk.store/refer{user?.id?`?agent=${user.id}`:''}</code>
-            </div>
-            <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{
-                const url=`brikk.store/refer${user?.id?'?agent='+user.id:''}`
-                if(navigator.clipboard){navigator.clipboard.writeText(url);showToast('Link copied!')}
-              }} style={{flex:1,background:c.text,border:"none",borderRadius:10,padding:"12px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Copy Link</button>
-              <a href={`/refer${user?.id?'?agent='+user.id:''}`} target="_blank" style={{display:"flex",alignItems:"center",justifyContent:"center",background:c.bg,border:`1px solid ${c.border}`,borderRadius:10,padding:"12px 16px",fontSize:13,fontWeight:600,color:c.sub,textDecoration:"none"}}>Preview</a>
-            </div>
-          </div>
-
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px"}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:16}}>Change Password</div>
-            <div style={{display:"grid",gap:14}}>
-              <div><label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Current Password</label><input type="password" value={oldPassword} onChange={e=>setOldPassword(e.target.value)} placeholder="Enter current password" style={inputStyle}/></div>
-              <div><label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>New Password</label><input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} placeholder="Min 6 characters" style={inputStyle}/></div>
-              <div><label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Confirm New Password</label><input type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="Confirm" style={inputStyle}/></div>
-            </div>
-            <button onClick={changePassword} disabled={saving} style={{marginTop:20,width:"100%",background:c.text,border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>{saving?'Updating...':'Update Password'}</button>
-          </div>
-        </>}
-
-        {activeTab==='appearance'&&<div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 0",borderBottom:`1px solid ${c.borderLight}`}}>
-            <div><div style={{fontSize:15,fontWeight:600}}>Dark Mode</div><div style={{fontSize:12,color:c.dim,marginTop:3}}>Invert colors for low light</div></div>
-            <button onClick={()=>setDarkMode(!darkMode)} style={{width:56,height:32,borderRadius:16,background:darkMode?c.green:"#D4D4D0",border:"none",cursor:"pointer",position:"relative",transition:"background 0.25s ease"}}><div style={{width:26,height:26,borderRadius:13,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.18)",position:"absolute",top:3,left:darkMode?27:3,transition:"left 0.25s ease"}}/></button>
-          </div>
-          <div style={{padding:"20px 0",borderBottom:`1px solid ${c.borderLight}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}><div><div style={{fontSize:15,fontWeight:600}}>Brightness</div><div style={{fontSize:12,color:c.dim,marginTop:3}}>Screen brightness</div></div><span style={{fontSize:14,fontWeight:700,background:c.bg,borderRadius:8,padding:"4px 10px"}}>{brightness}%</span></div>
-            <input type="range" min="40" max="100" value={brightness} onChange={e=>setBrightness(parseInt(e.target.value))} style={{width:"100%",height:8,borderRadius:4,appearance:"none",WebkitAppearance:"none",background:`linear-gradient(to right, ${c.text} ${(brightness-40)/60*100}%, #D4D4D0 ${(brightness-40)/60*100}%)`,outline:"none",cursor:"pointer"}}/>
-          </div>
-          <div style={{padding:"20px 0",borderBottom:`1px solid ${c.borderLight}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",marginBottom:14}}><div><div style={{fontSize:15,fontWeight:600}}>Blue Light Filter</div><div style={{fontSize:12,color:c.dim,marginTop:3}}>Warm tones for less eye strain</div></div><span style={{fontSize:14,fontWeight:700,color:"#D97706",background:"rgba(217,119,6,0.08)",borderRadius:8,padding:"4px 10px"}}>{blueLight}%</span></div>
-            <input type="range" min="0" max="100" value={blueLight} onChange={e=>setBlueLight(parseInt(e.target.value))} style={{width:"100%",height:8,borderRadius:4,appearance:"none",WebkitAppearance:"none",background:`linear-gradient(to right, #F59E0B ${blueLight}%, #D4D4D0 ${blueLight}%)`,outline:"none",cursor:"pointer"}}/>
-          </div>
-          <div style={{padding:"20px 0"}}>
-            <div style={{fontSize:15,fontWeight:600,marginBottom:12}}>Text Size</div>
-            <div style={{display:"flex",gap:8}}>
-              {[{id:'small',label:'Small'},{id:'medium',label:'Medium'},{id:'large',label:'Large'}].map(s=>(
-                <button key={s.id} onClick={()=>setTextSize(s.id)} style={{flex:1,padding:"14px 8px",borderRadius:12,border:textSize===s.id?`2px solid ${c.text}`:`1.5px solid ${c.border}`,background:textSize===s.id?c.text:"transparent",color:textSize===s.id?"#fff":c.sub,fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{s.label}</button>
-              ))}
-            </div>
-          </div>
-        </div>}
-
-        {activeTab==='billing'&&<div>
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px",marginBottom:16}}>
-            <div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:12,padding:"20px",marginBottom:24,textAlign:"center"}}>
-              <div style={{fontSize:20,fontWeight:700,color:c.green}}>Free Trial Active</div>
-              <div style={{fontSize:13,color:c.sub,marginTop:6}}>Full access to all features for 45 days</div>
-            </div>
-            <div style={{fontSize:13,color:c.sub,lineHeight:1.7,marginBottom:20,textAlign:"center"}}>Choose a plan to continue after your trial. You won't be charged until your trial ends.</div>
-          </div>
-
-          {/* Pro Plan */}
-          <div style={{background:c.white,border:`2px solid ${c.text}`,borderRadius:16,padding:"28px 20px",marginBottom:12}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-              <div>
-                <div style={{fontSize:18,fontWeight:700}}>Pro</div>
-                <div style={{fontSize:13,color:c.sub,marginTop:2}}>For solo agents</div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:28,fontWeight:700}}>$75<span style={{fontSize:14,fontWeight:400,color:c.dim}}>/mo</span></div>
-                <div style={{fontSize:11,color:c.dim}}>+ $125 one-time setup</div>
-              </div>
-            </div>
-            <div style={{fontSize:12,color:c.sub,margin:"16px 0",lineHeight:1.7}}>Everything in Brikk — AI Copilot, Lead Pipeline, Deal Tracker, Smart Calendar, Marketing ROI, Messages, Voice-to-CRM, and Lead Capture Link.</div>
-            <button onClick={async()=>{
-              setSaving(true)
-              try{
-                const res=await fetch('/api/stripe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:'pro',email:user?.email,userId:user?.id})})
-                const data=await res.json()
-                if(data.url)window.location.href=data.url
-                else showToast(data.error||'Something went wrong','error')
-              }catch(e){showToast('Failed to start checkout','error')}
-              setSaving(false)
-            }} disabled={saving} style={{width:"100%",background:c.text,border:"none",borderRadius:12,padding:"16px",fontSize:15,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
-              {saving?'Loading...':'Subscribe to Pro — $75/mo'}
-            </button>
-          </div>
-
-          {/* Team Plan */}
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"28px 20px",marginBottom:16}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-              <div>
-                <div style={{fontSize:18,fontWeight:700}}>Team</div>
-                <div style={{fontSize:13,color:c.sub,marginTop:2}}>Up to 5 agents</div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:28,fontWeight:700}}>$200<span style={{fontSize:14,fontWeight:400,color:c.dim}}>/mo</span></div>
-                <div style={{fontSize:11,color:c.dim}}>+ $125 one-time setup</div>
-              </div>
-            </div>
-            <div style={{fontSize:12,color:c.sub,margin:"16px 0",lineHeight:1.7}}>Everything in Pro plus up to 5 agent seats, team dashboard, lead routing, and priority support.</div>
-            <button onClick={async()=>{
-              setSaving(true)
-              try{
-                const res=await fetch('/api/stripe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:'team',email:user?.email,userId:user?.id})})
-                const data=await res.json()
-                if(data.url)window.location.href=data.url
-                else showToast(data.error||'Something went wrong','error')
-              }catch(e){showToast('Failed to start checkout','error')}
-              setSaving(false)
-            }} disabled={saving} style={{width:"100%",background:c.bg,border:`1px solid ${c.border}`,borderRadius:12,padding:"16px",fontSize:15,fontWeight:600,color:c.text,cursor:"pointer",fontFamily:"inherit",opacity:saving?0.6:1}}>
-              {saving?'Loading...':'Subscribe to Team — $200/mo'}
-            </button>
-          </div>
-
-          <div style={{textAlign:"center",padding:"12px 0"}}>
-            <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>{['Visa','Mastercard','Amex','Apple Pay','Google Pay','Klarna'].map(p=>(<span key={p} style={{fontSize:10,color:c.dim,background:c.bg,borderRadius:6,padding:"4px 8px",border:`1px solid ${c.borderLight}`}}>{p}</span>))}</div>
-            <div style={{fontSize:11,color:c.dim,marginTop:10}}>Payments secured by Stripe. 45-day free trial included. Cancel anytime.</div>
-          </div>
-        </div>}
-
-        {activeTab==='referral'&&<div>
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px",marginBottom:16}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Your Lead Capture Link</div>
-            <div style={{fontSize:12,color:c.dim,marginBottom:16}}>Share this link on your business card, social media, or email signature. Anyone who fills it out becomes a lead in your pipeline.</div>
-            <div style={{background:c.bg,border:`1px solid ${c.border}`,borderRadius:10,padding:"14px 16px",fontSize:13,color:c.text,wordBreak:"break-all",marginBottom:12}}>{referralLink}</div>
-            <button onClick={()=>{navigator.clipboard?.writeText(referralLink);showToast('Link copied!')}} style={{width:"100%",background:c.text,border:"none",borderRadius:12,padding:"14px",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>Copy Link</button>
-          </div>
-          <a href={referralLink} target="_blank" style={{display:"block",background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"18px 20px",textDecoration:"none"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:14,fontWeight:600,color:c.text}}>Preview Form</span><span style={{color:c.dim}}>›</span></div>
-          </a>
-        </div>}
-
-        {activeTab==='privacy'&&<>
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px",marginBottom:16}}>
-            <div style={{fontSize:15,fontWeight:700,marginBottom:16}}>Data Controls</div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 0",borderBottom:`1px solid ${c.borderLight}`}}>
-              <div><div style={{fontSize:14,fontWeight:600}}>AI Data Processing</div><div style={{fontSize:12,color:c.dim,marginTop:3}}>Let AI analyze leads for better drafts</div></div>
-              <button style={{width:56,height:32,borderRadius:16,background:c.green,border:"none",cursor:"pointer",position:"relative"}}><div style={{width:26,height:26,borderRadius:13,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.18)",position:"absolute",top:3,left:27}}/></button>
-            </div>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"16px 0"}}>
-              <div><div style={{fontSize:14,fontWeight:600}}>SMS Messaging</div><div style={{fontSize:12,color:c.dim,marginTop:3}}>Allow sending texts to leads</div></div>
-              <button style={{width:56,height:32,borderRadius:16,background:c.green,border:"none",cursor:"pointer",position:"relative"}}><div style={{width:26,height:26,borderRadius:13,background:"#fff",boxShadow:"0 1px 4px rgba(0,0,0,0.18)",position:"absolute",top:3,left:27}}/></button>
-            </div>
-          </div>
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px",marginBottom:16}}>
-            <div style={{display:"grid",gap:10}}>
-              <button style={{width:"100%",background:c.bg,border:`1px solid ${c.border}`,borderRadius:12,padding:"14px 16px",fontSize:13,fontWeight:600,color:c.sub,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>Export All Data</button>
-              <button style={{width:"100%",background:c.redSoft,border:`1px solid rgba(190,18,60,0.15)`,borderRadius:12,padding:"14px 16px",fontSize:13,fontWeight:600,color:c.red,cursor:"pointer",fontFamily:"inherit",textAlign:"left"}}>Delete Account</button>
-            </div>
-          </div>
-          <a href="/privacy" target="_blank" style={{display:"block",background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"18px 20px",textDecoration:"none"}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:14,fontWeight:600,color:c.text}}>Full Privacy Policy</span><span style={{color:c.dim}}>›</span></div></a>
-        </>}
-
-        {activeTab==='agreement'&&<>
-          <a href="/terms" target="_blank" style={{display:"block",background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"18px 20px",textDecoration:"none",marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:14,fontWeight:600,color:c.text}}>Terms of Service</span><span style={{color:c.dim}}>›</span></div></a>
-          <a href="/privacy" target="_blank" style={{display:"block",background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"18px 20px",textDecoration:"none",marginBottom:10}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}><span style={{fontSize:14,fontWeight:600,color:c.text}}>Privacy Policy</span><span style={{color:c.dim}}>›</span></div></a>
-          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,padding:"24px 20px"}}><div style={{fontSize:15,fontWeight:700,marginBottom:12}}>Acceptable Use</div><div style={{fontSize:13,color:c.sub,lineHeight:1.8}}>By using Brikk you agree to use the service for legitimate real estate business purposes. Review all AI-generated content before sending. You are responsible for CAN-SPAM, TCPA, and local real estate compliance.</div></div>
-        </>}
       </div>
     </div>
   )
 }
+
+const Section = ({ title, description, children, footer }) => (
+  <div style={{ ...card, marginBottom: 16 }}>
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ ...type.sectionTitle }}>{title}</div>
+      {description && <div style={{ ...type.bodySub, marginTop: 4 }}>{description}</div>}
+    </div>
+    {children}
+    {footer && <div style={{ marginTop: 16 }}>{footer}</div>}
+  </div>
+)
+
+const Field = ({ label, children }) => (
+  <div>
+    <label style={inputLabel}>{label}</label>
+    {children}
+  </div>
+)
+
+const ProfileTab = ({
+  user, editName, setEditName, editPhone, setEditPhone, editBrokerage, setEditBrokerage,
+  profilePic, initials, fileInputRef, onPic, onSave, saving,
+  oldPassword, setOldPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword, onChangePassword,
+}) => (
+  <>
+    <Section title="Profile" description="How you appear inside Brikk. This is only visible to you and your team if you have one.">
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 20 }}>
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            width: 56, height: 56, borderRadius: 8,
+            background: profilePic ? 'transparent' : c.bgInset,
+            border: `1px solid ${c.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', overflow: 'hidden', flexShrink: 0,
+          }}
+        >
+          {profilePic
+            ? <img src={profilePic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: 16, fontWeight: 600, color: c.text }}>{initials}</span>}
+        </div>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={onPic} style={{ display: 'none' }} />
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>{editName || 'Add your name'}</div>
+          <div style={{ ...type.meta }}>Click photo to change</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+        <Field label="Full name">
+          <input value={editName} onChange={e => setEditName(e.target.value)} style={input} />
+        </Field>
+        <Field label="Email">
+          <input value={user?.email || ''} disabled style={{ ...input, background: c.bgInset, color: c.dim }} />
+        </Field>
+        <Field label="Phone">
+          <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="(801) 555-0142" style={input} />
+        </Field>
+        <Field label="Brokerage">
+          <input value={editBrokerage} onChange={e => setEditBrokerage(e.target.value)} placeholder="Keller Williams, eXp…" style={input} />
+        </Field>
+      </div>
+
+      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+        <button onClick={onSave} disabled={saving} style={{ ...btn.primary, opacity: saving ? 0.5 : 1 }}>
+          {saving ? 'Saving…' : 'Save changes'}
+        </button>
+      </div>
+    </Section>
+
+    <Section title="Password" description="Use at least 6 characters. Updating signs you out of other devices.">
+      <div style={{ display: 'grid', gap: 12, maxWidth: 420 }}>
+        <Field label="Current password">
+          <input type="password" value={oldPassword} onChange={e => setOldPassword(e.target.value)} placeholder="Current password" style={input} />
+        </Field>
+        <Field label="New password">
+          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="At least 6 characters" style={input} />
+        </Field>
+        <Field label="Confirm new password">
+          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirm" style={input} />
+        </Field>
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <button onClick={onChangePassword} disabled={saving} style={{ ...btn.primary, opacity: saving ? 0.5 : 1 }}>
+          {saving ? 'Updating…' : 'Update password'}
+        </button>
+      </div>
+    </Section>
+  </>
+)
+
+const AppearanceTab = ({ darkMode, setDarkMode, brightness, setBrightness, blueLight, setBlueLight, textSize, setTextSize }) => (
+  <Section title="Appearance" description="Tune how Brikk looks on this device. Settings sync across pages.">
+    <SettingRow
+      label="Dark mode"
+      hint="Inverts colors for low-light environments."
+      control={<Toggle on={darkMode} onChange={() => setDarkMode(!darkMode)} />}
+    />
+    <Slider label="Brightness" value={brightness} min={40} max={100} unit="%" onChange={v => setBrightness(v)} />
+    <Slider label="Blue light filter" value={blueLight} min={0} max={100} unit="%" onChange={v => setBlueLight(v)} color="#D97706" />
+    <div style={{ marginTop: 12 }}>
+      <div style={{ ...inputLabel, marginBottom: 8 }}>Text size</div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[{ id: 'small', label: 'Small' }, { id: 'medium', label: 'Medium' }, { id: 'large', label: 'Large' }].map(s => (
+          <button
+            key={s.id}
+            onClick={() => setTextSize(s.id)}
+            style={{
+              flex: 1, height: 36, borderRadius: 6,
+              border: `1px solid ${textSize === s.id ? c.text : c.border}`,
+              background: textSize === s.id ? c.text : c.white,
+              color: textSize === s.id ? c.white : c.sub,
+              fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >{s.label}</button>
+        ))}
+      </div>
+    </div>
+  </Section>
+)
+
+const SettingRow = ({ label, hint, control }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${c.borderLight}` }}>
+    <div>
+      <div style={{ fontSize: 14, fontWeight: 500 }}>{label}</div>
+      {hint && <div style={{ ...type.meta, marginTop: 2 }}>{hint}</div>}
+    </div>
+    {control}
+  </div>
+)
+
+const Toggle = ({ on, onChange }) => (
+  <button
+    onClick={onChange}
+    aria-pressed={on}
+    style={{
+      width: 44, height: 26, borderRadius: 13,
+      background: on ? c.green : c.border,
+      border: 'none', cursor: 'pointer',
+      position: 'relative',
+      transition: 'background 0.2s ease',
+    }}
+  >
+    <div style={{
+      width: 20, height: 20, borderRadius: 10,
+      background: c.white,
+      boxShadow: '0 1px 3px rgba(0,0,0,0.18)',
+      position: 'absolute',
+      top: 3,
+      left: on ? 21 : 3,
+      transition: 'left 0.2s ease',
+    }} />
+  </button>
+)
+
+const Slider = ({ label, value, min, max, onChange, unit, color }) => (
+  <div style={{ padding: '14px 0', borderBottom: `1px solid ${c.borderLight}` }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+      <span style={{ fontSize: 14, fontWeight: 500 }}>{label}</span>
+      <span style={{ ...type.meta, fontVariantNumeric: 'tabular-nums' }}>{value}{unit}</span>
+    </div>
+    <input
+      type="range"
+      min={min} max={max}
+      value={value}
+      onChange={e => onChange(parseInt(e.target.value))}
+      style={{
+        width: '100%', height: 6, borderRadius: 3,
+        appearance: 'none', WebkitAppearance: 'none',
+        background: `linear-gradient(to right, ${color || c.text} ${((value - min) / (max - min)) * 100}%, ${c.border} ${((value - min) / (max - min)) * 100}%)`,
+        outline: 'none', cursor: 'pointer',
+      }}
+    />
+  </div>
+)
+
+const BillingTab = ({ user, saving, setSaving, showToast }) => {
+  const checkout = async (plan) => {
+    setSaving(true)
+    try {
+      const res = await fetch('/api/stripe', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan, email: user?.email, userId: user?.id }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else showToast(data.error || 'Something went wrong', 'error')
+    } catch {
+      showToast('Failed to start checkout', 'error')
+    }
+    setSaving(false)
+  }
+  return (
+    <>
+      <Section title="Trial status">
+        <div style={{
+          background: c.greenSoft, border: `1px solid ${c.greenBorder}`,
+          borderRadius: 6, padding: '14px 16px',
+        }}>
+          <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>Free trial active</div>
+          <div style={{ ...type.bodySub, marginTop: 2 }}>Full access to every feature for 45 days. No charge until your trial ends.</div>
+        </div>
+      </Section>
+
+      <Section title="Plans" description="Cancel anytime in Settings.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+          <PlanCard
+            title="Pro" subtitle="Solo agents"
+            price="$75" period="/mo" setup="+$125 setup"
+            features="AI Copilot · Pipeline · Deals · Calendar · Marketing · Messages · Voice-to-CRM · Lead capture link"
+            primary
+            onClick={() => checkout('pro')}
+            saving={saving}
+          />
+          <PlanCard
+            title="Team" subtitle="Up to 5 agents"
+            price="$200" period="/mo" setup="+$125 setup"
+            features="Everything in Pro plus team dashboard, lead routing, and priority support."
+            onClick={() => checkout('team')}
+            saving={saving}
+          />
+        </div>
+        <div style={{ ...type.meta, marginTop: 14 }}>Payments secured by Stripe. 45-day free trial included. Cancel anytime.</div>
+      </Section>
+    </>
+  )
+}
+
+const PlanCard = ({ title, subtitle, price, period, setup, features, primary, onClick, saving }) => (
+  <div style={{
+    background: c.white,
+    border: `1px solid ${primary ? c.text : c.border}`,
+    borderRadius: 8,
+    padding: '20px 18px',
+    display: 'flex', flexDirection: 'column', gap: 12,
+  }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <div>
+        <div style={{ fontSize: 16, fontWeight: 600 }}>{title}</div>
+        <div style={{ ...type.meta }}>{subtitle}</div>
+      </div>
+      <div style={{ textAlign: 'right' }}>
+        <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>
+          {price}<span style={{ fontSize: 13, color: c.dim, fontWeight: 400 }}>{period}</span>
+        </div>
+        <div style={{ ...type.meta }}>{setup}</div>
+      </div>
+    </div>
+    <div style={{ ...type.bodySub, fontSize: 12.5 }}>{features}</div>
+    <button
+      onClick={onClick}
+      disabled={saving}
+      style={{ ...(primary ? btn.primary : btn.secondary), opacity: saving ? 0.5 : 1 }}
+    >
+      {saving ? 'Loading…' : `Subscribe — ${price}${period}`}
+    </button>
+  </div>
+)
+
+const ReferralTab = ({ referralLink, showToast }) => (
+  <Section title="Lead capture link" description="Share this on business cards, social media, or email signatures. Submissions arrive in your pipeline tagged 'Referral Link'.">
+    <div style={{
+      background: c.bgInset, border: `1px solid ${c.border}`,
+      borderRadius: 6, padding: '12px 14px',
+      fontSize: 13, color: c.text, wordBreak: 'break-all', marginBottom: 12,
+      fontFamily: 'ui-monospace, SFMono-Regular, monospace',
+    }}>{referralLink}</div>
+    <div style={{ display: 'flex', gap: 8 }}>
+      <button
+        onClick={() => { navigator.clipboard?.writeText(referralLink); showToast('Link copied') }}
+        style={btn.primary}
+      >Copy link</button>
+      <a href={referralLink} target="_blank" rel="noreferrer" style={{ ...btn.secondary, textDecoration: 'none' }}>Preview</a>
+    </div>
+  </Section>
+)
+
+const PrivacyTab = () => (
+  <>
+    <Section title="Data controls">
+      <SettingRow
+        label="AI data processing"
+        hint="Let Copilot analyze each lead's context to draft better follow-ups."
+        control={<Toggle on={true} onChange={() => {}} />}
+      />
+      <SettingRow
+        label="SMS messaging"
+        hint="Send texts to leads via Twilio."
+        control={<Toggle on={true} onChange={() => {}} />}
+      />
+    </Section>
+    <Section title="Account">
+      <div style={{ display: 'grid', gap: 8, maxWidth: 320 }}>
+        <button style={btn.secondary}>Export all data</button>
+        <button style={btn.danger}>Delete account</button>
+      </div>
+    </Section>
+    <Section title="Policy">
+      <a href="/privacy" target="_blank" rel="noreferrer" style={{ fontSize: 13, color: c.text }}>Read the full privacy policy →</a>
+    </Section>
+  </>
+)
+
+const AgreementTab = () => (
+  <>
+    <Section title="Documents">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <a href="/terms" target="_blank" rel="noreferrer" style={{ fontSize: 13, color: c.text }}>Terms of service →</a>
+        <a href="/privacy" target="_blank" rel="noreferrer" style={{ fontSize: 13, color: c.text }}>Privacy policy →</a>
+      </div>
+    </Section>
+    <Section title="Acceptable use">
+      <div style={{ ...type.bodySub }}>
+        By using Brikk you agree to use the service for legitimate real estate business. Review all AI-generated content before sending.
+        You are responsible for CAN-SPAM, TCPA, and local real estate compliance.
+      </div>
+    </Section>
+  </>
+)

@@ -1,56 +1,58 @@
 import { NextResponse } from 'next/server'
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://brikk.store'
 
 const PRICES = {
   pro: {
     monthly: 'price_1TMALg2MsBrmQDSseFz1jgY4',
-    setup: 'price_1TMAN52MsBrmQDSs6JLxHq2q'
+    setup:   'price_1TMAN52MsBrmQDSs6JLxHq2q',
   },
   team: {
     monthly: 'price_1TMAOF2MsBrmQDSsosNK9PDd',
-    setup: 'price_1TMAOY2MsBrmQDSssZerYEDF'
-  }
+    setup:   'price_1TMAOY2MsBrmQDSssZerYEDF',
+  },
 }
 
 export async function POST(request) {
   try {
-    const { plan, email, userId } = await request.json()
+    if (!STRIPE_SECRET) {
+      return NextResponse.json({ error: 'Billing not configured' }, { status: 503 })
+    }
 
+    const { plan, email, userId } = await request.json()
     if (!plan || !PRICES[plan]) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
     const prices = PRICES[plan]
 
-    // Create Stripe Checkout Session
     const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${STRIPE_SECRET}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
+        Authorization: `Bearer ${STRIPE_SECRET}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: new URLSearchParams({
-        'mode': 'subscription',
-        'success_url': 'https://brikk.store/app/settings?payment=success',
-        'cancel_url': 'https://brikk.store/app/settings?payment=cancelled',
-        'customer_email': email || '',
-        'client_reference_id': userId || '',
+        mode: 'subscription',
+        success_url: `${APP_URL}/app/settings?payment=success`,
+        cancel_url:  `${APP_URL}/app/settings?payment=cancelled`,
+        customer_email: email || '',
+        client_reference_id: userId || '',
         'subscription_data[trial_period_days]': '45',
         'line_items[0][price]': prices.monthly,
         'line_items[0][quantity]': '1',
         'line_items[1][price]': prices.setup,
         'line_items[1][quantity]': '1',
         'payment_method_types[0]': 'card',
-        'allow_promotion_codes': 'true',
-        'billing_address_collection': 'auto',
+        allow_promotion_codes: 'true',
+        billing_address_collection: 'auto',
         'metadata[plan]': plan,
         'metadata[userId]': userId || '',
-      }).toString()
+      }).toString(),
     })
 
     const session = await res.json()
-
     if (session.error) {
       console.error('Stripe error:', session.error)
       return NextResponse.json({ error: session.error.message }, { status: 400 })
@@ -58,7 +60,7 @@ export async function POST(request) {
 
     return NextResponse.json({ url: session.url, sessionId: session.id })
   } catch (err) {
-    console.error('Stripe API error:', err)
+    console.error('Stripe API error:', err?.message)
     return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
   }
 }
