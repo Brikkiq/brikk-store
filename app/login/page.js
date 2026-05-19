@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { c, type, card, btn, input, inputLabel } from '@/lib/design'
+import { Logo } from '@/lib/Logo'
 
 export default function Login() {
   const [mode, setMode] = useState('login')
@@ -123,8 +124,10 @@ export default function Login() {
     <Shell>
       <div style={{ width: '100%', maxWidth: 400 }}>
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <a href="/" style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.025em', color: c.text, textDecoration: 'none' }}>Brikk</a>
-          <div style={{ ...type.bodySub, marginTop: 6 }}>
+          <a href="/" style={{ display: 'inline-flex', textDecoration: 'none' }}>
+            <Logo size={22} />
+          </a>
+          <div style={{ ...type.bodySub, marginTop: 10 }}>
             {mode === 'login' ? 'Welcome back.' : 'Start your 45-day free trial.'}
           </div>
           {mode === 'signup' && (

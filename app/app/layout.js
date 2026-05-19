@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { c } from '@/lib/design'
+import { Logo } from '@/lib/Logo'
 
 const navItems = [
   { label: 'Today',     href: '/app',           key: 'home' },
@@ -56,7 +57,6 @@ export default function AppLayout({ children }) {
   const [currentPath, setCurrentPath] = useState('/app')
   const [banner, setBanner] = useState(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const touchStartY = useRef(0)
   const isPulling = useRef(false)
   const [pullDistance, setPullDistance] = useState(0)
@@ -156,9 +156,9 @@ export default function AppLayout({ children }) {
   if (loading) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.bg }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em', color: c.text, opacity: 0.7 }}>Brikk</div>
-          <div style={{ fontSize: 12, color: c.dim, marginTop: 6 }}>Loading workspace…</div>
+        <div style={{ textAlign: 'center', opacity: 0.85 }}>
+          <Logo size={22} />
+          <div style={{ fontSize: 12, color: c.dim, marginTop: 8 }}>Loading workspace…</div>
         </div>
       </div>
     )
@@ -171,6 +171,7 @@ export default function AppLayout({ children }) {
 
   return (
     <div
+      className="brikk-shell"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -184,17 +185,20 @@ export default function AppLayout({ children }) {
       }}
     >
       <style>{`
+        .brikk-shell { flex-direction: row; }
         @media (min-width: 901px) {
+          .brikk-shell { flex-direction: row !important; }
           .brikk-sidebar { display: flex !important; }
           .brikk-mobile-top { display: none !important; }
           .brikk-mobile-tabbar { display: none !important; }
           .brikk-main { margin-left: 220px; }
         }
         @media (max-width: 900px) {
+          .brikk-shell { flex-direction: column !important; }
           .brikk-sidebar { display: none !important; }
           .brikk-mobile-top { display: flex !important; }
           .brikk-mobile-tabbar { display: flex !important; }
-          .brikk-main { margin-left: 0; padding-bottom: 80px !important; }
+          .brikk-main { margin-left: 0 !important; padding: 16px 16px 80px !important; max-width: 100% !important; }
         }
         .brikk-nav-link {
           display: flex; align-items: center; gap: 10px;
@@ -210,6 +214,10 @@ export default function AppLayout({ children }) {
         .brikk-page-enter { animation: brikkFade 0.22s ease-out; }
         @keyframes brikkSpin { to { transform: rotate(360deg); } }
         .brikk-spinner { animation: brikkSpin 0.8s linear infinite; }
+        .brikk-page-padding { padding: 28px 32px 48px; }
+        @media (max-width: 900px) {
+          .brikk-page-padding { padding: 16px 16px 96px !important; }
+        }
       `}</style>
 
       {/* Sidebar (desktop) */}
@@ -227,8 +235,8 @@ export default function AppLayout({ children }) {
         }}
       >
         <div style={{ padding: '20px 20px 16px' }}>
-          <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.025em', color: c.text }}>Brikk</div>
-          <div style={{ fontSize: 11, color: c.dim, marginTop: 2, letterSpacing: '0.04em' }}>COMMAND CENTER</div>
+          <Logo size={18} />
+          <div style={{ fontSize: 11, color: c.dim, marginTop: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Command center</div>
         </div>
 
         <nav style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -293,7 +301,7 @@ export default function AppLayout({ children }) {
           width: '100%',
         }}
       >
-        <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.025em' }}>Brikk</div>
+        <Logo size={18} />
       </header>
 
       {/* Main */}
@@ -337,10 +345,9 @@ export default function AppLayout({ children }) {
         )}
 
         <main
-          className="brikk-page-enter"
+          className="brikk-page-enter brikk-page-padding"
           style={{
             flex: 1,
-            padding: '28px 32px 48px',
             maxWidth: 1240,
             width: '100%',
             margin: '0 auto',

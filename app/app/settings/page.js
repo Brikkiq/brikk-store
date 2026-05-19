@@ -552,22 +552,24 @@ const ReferralTab = ({ referralLink, showToast }) => (
 
 const PrivacyTab = () => (
   <>
-    <Section title="Data controls">
-      <SettingRow
-        label="AI data processing"
-        hint="Let Copilot analyze each lead's context to draft better follow-ups."
-        control={<Toggle on={true} onChange={() => {}} />}
-      />
-      <SettingRow
-        label="SMS messaging"
-        hint="Send texts to leads via Twilio."
-        control={<Toggle on={true} onChange={() => {}} />}
-      />
+    <Section title="How your data is used" description="Brikk stores leads, deals, messages, and interactions you create. Your data is isolated by Supabase row-level security — only you can see your own pipeline.">
+      <ul style={{ ...type.bodySub, paddingLeft: 18, margin: 0, lineHeight: 1.75 }}>
+        <li>AI Copilot reads each lead's history when drafting follow-ups (Anthropic).</li>
+        <li>Voice notes are transcribed in your browser, then sent to Anthropic to extract structured fields.</li>
+        <li>SMS goes through Twilio and is logged to your conversation history.</li>
+        <li>We never sell data and don't share it with third parties beyond the providers above.</li>
+      </ul>
     </Section>
     <Section title="Account">
       <div style={{ display: 'grid', gap: 8, maxWidth: 320 }}>
-        <button style={btn.secondary}>Export all data</button>
-        <button style={btn.danger}>Delete account</button>
+        <button
+          onClick={() => alert('Data export is coming soon. Email hello@brikk.store and we will send your data directly.')}
+          style={btn.secondary}
+        >Export all data</button>
+        <button
+          onClick={() => alert('To delete your account, email hello@brikk.store from the address on your account.')}
+          style={btn.danger}
+        >Delete account</button>
       </div>
     </Section>
     <Section title="Policy">

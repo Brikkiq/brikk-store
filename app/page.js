@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts"
+import { Logo } from '@/lib/Logo'
 
 const c = {
   bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",
@@ -184,7 +185,7 @@ export default function Home(){
 
       {/* Nav */}
       <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px",maxWidth:1120,margin:"0 auto"}}>
-        <span style={{fontSize:18,fontWeight:700,letterSpacing:"-0.02em"}}>Brikk</span>
+        <a href="/" style={{textDecoration:"none"}}><Logo size={18}/></a>
         <div style={{display:"flex",alignItems:"center",gap:20}}>
           <a href="#features" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
           <a href="#how" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>How It Works</a>
