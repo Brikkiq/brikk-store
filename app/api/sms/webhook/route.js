@@ -1,3 +1,7 @@
+// LEGACY — inbound SMS webhook for Twilio. Brikk no longer sends through Twilio,
+// so there's no inbound stream to receive. Agents now log replies manually in the
+// Conversations page. This route still validates Twilio signatures if you ever
+// re-enable Twilio. Leave the env vars unset to disable.
 import { createClient } from '@supabase/supabase-js'
 import twilio from 'twilio'
 

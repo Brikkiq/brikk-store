@@ -39,13 +39,18 @@ export default function LeadsPage() {
   const loadLeads = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data, error } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-    if (error) console.error('Load leads failed:', error.message)
-    setLeads(data || [])
+    const [leadsRes, messagesRes] = await Promise.all([
+      supabase.from('leads').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('messages').select('lead_id, direction, content, created_at').eq('user_id', user.id).order('created_at', { ascending: false }),
+    ])
+    if (leadsRes.error) console.error('Load leads failed:', leadsRes.error.message)
+
+    // Build a quick lookup of the most recent message per lead
+    const lastByLead = {}
+    for (const m of (messagesRes.data || [])) {
+      if (!lastByLead[m.lead_id]) lastByLead[m.lead_id] = m
+    }
+    setLeads((leadsRes.data || []).map(l => ({ ...l, _last_message: lastByLead[l.id] || null })))
     setLoading(false)
   }
 
@@ -263,13 +268,13 @@ export default function LeadsPage() {
                       style={{ borderTop: `1px solid ${c.border}`, transition: 'background 0.1s ease' }}
                     >
                       <td style={td()}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <a href={`/app/leads/${l.id}`} style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: 'inherit' }}>
                           <Avatar name={l.name} temperature={l.temperature} />
                           <div>
                             <div style={{ fontWeight: 500, color: c.text }}>{l.name}</div>
                             <div style={{ ...type.meta }}>{l.phone || l.email || '—'}</div>
                           </div>
-                        </div>
+                        </a>
                       </td>
                       <td style={td()}>
                         <span style={temperatureChip(l.temperature)}>{(l.temperature || '—').toUpperCase()}</span>
@@ -278,12 +283,10 @@ export default function LeadsPage() {
                       <td style={td()}>{l.source || '—'}</td>
                       <td style={td()}>{l.price_range || '—'}</td>
                       <td style={td()}>
-                        <span style={{ color: overdue ? c.red : days != null && days >= 3 ? c.amber : c.sub }}>
-                          {fmt.relativeDate(l.last_contact_date)}
-                        </span>
+                        <ReadIndicator lead={l} overdue={overdue} daysSince={days} />
                       </td>
                       <td style={{ ...td(), textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button onClick={() => handleLogContact(l.id)} style={{ ...btn.ghost, color: c.green }}>Log</button>
+                        <QuickActions lead={l} onLog={() => handleLogContact(l.id)} />
                         <button onClick={() => handleEdit(l)} style={btn.ghost}>Edit</button>
                         <button onClick={() => handleDelete(l.id)} style={{ ...btn.ghost, color: c.red }} aria-label="Delete">×</button>
                       </td>
@@ -361,6 +364,109 @@ const Avatar = ({ name, temperature }) => {
   )
 }
 
+// Read-indicator: who owes a response and how stale is the thread.
+const ReadIndicator = ({ lead, overdue, daysSince }) => {
+  const last = lead._last_message
+  if (!last) {
+    return (
+      <span style={{ color: overdue ? c.red : daysSince != null && daysSince >= 3 ? c.amber : c.sub }}>
+        {fmt.relativeDate(lead.last_contact_date)}
+      </span>
+    )
+  }
+  const sentByYou = last.direction === 'outbound'
+  const rel = fmt.relativeDate(last.created_at)
+  // If they replied and we haven't responded — flag it.
+  const yourTurn = !sentByYou
+  const tone = yourTurn ? c.red : daysSince != null && daysSince >= 5 ? c.amber : c.sub
+  const label = sentByYou ? 'You sent' : 'They replied'
+  return (
+    <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2 }}>
+      <span style={{ fontSize: 12, color: tone, fontWeight: yourTurn ? 600 : 400 }}>
+        {label} · {rel}
+      </span>
+      {yourTurn && (
+        <span style={{ fontSize: 10, color: c.red, fontWeight: 600, letterSpacing: '0.03em', textTransform: 'uppercase' }}>
+          Your turn
+        </span>
+      )}
+    </span>
+  )
+}
+
+// Inline native-action icons. Clicking phone/text/email fires the right
+// device-level link AND logs the touch as an interaction so the activity shows up
+// in the lead's history.
+const QuickActions = ({ lead, onLog }) => {
+  const phone = lead.phone ? String(lead.phone).replace(/[^0-9+]/g, '') : null
+  const email = lead.email
+  const messagesHref = `/app/messages?lead=${lead.id}`
+
+  const fireAndLog = async (kind) => {
+    // Best-effort log — runs after the native link fires
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase.from('interactions').insert({
+        user_id: user.id,
+        lead_id: lead.id,
+        interaction_type: kind,
+        notes: `Opened native ${kind} from leads`,
+      })
+      await supabase.from('leads').update({
+        last_contact_date: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', lead.id)
+    } catch {}
+  }
+
+  const iconBtn = {
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '4px 6px',
+    color: c.sub,
+    fontFamily: 'inherit',
+    fontSize: 13,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 4,
+    textDecoration: 'none',
+  }
+
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }}>
+      {phone && (
+        <a href={`tel:${phone}`} onClick={() => fireAndLog('call')} style={iconBtn} title="Call" aria-label={`Call ${lead.name}`}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+          </svg>
+        </a>
+      )}
+      {phone && (
+        <a href={`sms:${phone}`} onClick={() => fireAndLog('text')} style={iconBtn} title="Text" aria-label={`Text ${lead.name}`}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a8 8 0 0 1-11.4 7.3L3 21l1.7-6.6A8 8 0 1 1 21 12z"/>
+          </svg>
+        </a>
+      )}
+      {email && (
+        <a href={`mailto:${email}`} onClick={() => fireAndLog('email')} style={iconBtn} title="Email" aria-label={`Email ${lead.name}`}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </a>
+      )}
+      <button onClick={onLog} style={{ ...iconBtn, color: c.green }} title="Log contact" aria-label="Log contact">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </button>
+    </span>
+  )
+}
+
 const LeadCard = ({ lead, onEdit, onDelete, onLog }) => {
   const days = fmt.daysSince(lead.last_contact_date)
   return (
@@ -377,11 +483,11 @@ const LeadCard = ({ lead, onEdit, onDelete, onLog }) => {
           </div>
           {lead.phone && <div style={{ ...type.meta, marginTop: 2 }}>{lead.phone}</div>}
           {lead.price_range && <div style={{ ...type.meta, marginTop: 2 }}>{lead.price_range}</div>}
-          <div style={{ ...type.meta, marginTop: 4, color: days != null && days >= 5 ? c.red : days != null && days >= 3 ? c.amber : c.dim }}>
-            Last contact: {fmt.relativeDate(lead.last_contact_date)}
+          <div style={{ marginTop: 4 }}>
+            <ReadIndicator lead={lead} overdue={days != null && days >= 5} daysSince={days} />
           </div>
-          <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
-            <button onClick={onLog} style={{ ...btn.secondary, height: 30, padding: '4px 12px', fontSize: 12, color: c.green }}>Log</button>
+          <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+            <QuickActions lead={lead} onLog={onLog} />
             <button onClick={onEdit} style={{ ...btn.secondary, height: 30, padding: '4px 12px', fontSize: 12 }}>Edit</button>
             <button onClick={onDelete} style={{ ...btn.ghost, height: 30, padding: '4px 12px', fontSize: 12, color: c.red, marginLeft: 'auto' }}>Delete</button>
           </div>

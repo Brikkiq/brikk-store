@@ -50,39 +50,22 @@ export default function MessagesPage() {
     setMessages(data || [])
   }
 
-  const handleSend = async () => {
+  // Log an outbound message to the conversation history. Called after the agent
+  // taps "Open in Messages" or "Copy" — we assume they actually sent it.
+  // Channel describes how the agent sent it: 'text' (native SMS), 'email', 'manual' (copy/paste anywhere).
+  const logOutbound = async (channel) => {
     if (!draft.trim() || !selectedLead) return
     setSending(true)
-    const { data: { user }, error: authErr } = await supabase.auth.getUser()
-    const session = (await supabase.auth.getSession()).data.session
-    if (authErr || !user) { setSending(false); return }
-
-    let smsStatus = 'logged'
-    let smsError = null
-
-    if (selectedLead.phone) {
-      try {
-        const smsRes = await fetch('/api/sms', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({ to: selectedLead.phone, message: draft.trim() }),
-        })
-        const smsData = await smsRes.json()
-        if (smsData.success) smsStatus = 'sent'
-        else { smsStatus = 'failed'; smsError = smsData.error }
-      } catch (err) {
-        smsStatus = 'failed'
-        smsError = err?.message || 'Network error'
-      }
-    }
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSending(false); return }
 
     await supabase.from('messages').insert({
-      user_id: user.id, lead_id: selectedLead.id,
-      direction: 'outbound', channel: 'text',
-      content: draft.trim(), status: smsStatus,
+      user_id: user.id,
+      lead_id: selectedLead.id,
+      direction: 'outbound',
+      channel,
+      content: draft.trim(),
+      status: channel === 'manual' ? 'copied' : 'sent_via_phone',
     })
     await supabase.from('leads').update({
       last_contact_date: new Date().toISOString(),
@@ -90,12 +73,9 @@ export default function MessagesPage() {
     }).eq('id', selectedLead.id)
     await supabase.from('interactions').insert({
       user_id: user.id, lead_id: selectedLead.id,
-      interaction_type: 'text',
-      notes: `${smsStatus === 'sent' ? 'SMS sent' : 'Message logged'}: ${draft.trim()}`,
+      interaction_type: channel === 'email' ? 'email' : 'text',
+      notes: `Sent via ${channel}: ${draft.trim()}`,
     })
-
-    if (smsError) showToast(`SMS failed: ${smsError}`)
-    else showToast('Message sent')
 
     setDraft('')
     setSending(false)
@@ -104,16 +84,163 @@ export default function MessagesPage() {
     loadData()
   }
 
-  const handleAIDraft = async () => {
-    if (!selectedLead) return
-    setGenerating(true)
-    const days = fmt.daysSince(selectedLead.last_contact_date) ?? 0
+  // Format the lead's phone for an sms: URL. Returns null if no phone.
+  const smsHref = (() => {
+    if (!selectedLead?.phone || !draft.trim()) return null
+    const phone = selectedLead.phone.replace(/[^0-9+]/g, '')
+    if (!phone) return null
+    // iOS uses sms:NUMBER&body=… ; Android accepts the same.
+    // encodeURIComponent handles emoji + apostrophes correctly.
+    return `sms:${phone}${navigator.userAgent.includes('iPhone') ? '&' : '?'}body=${encodeURIComponent(draft.trim())}`
+  })()
+
+  const mailtoHref = (() => {
+    if (!selectedLead?.email || !draft.trim()) return null
+    return `mailto:${selectedLead.email}?body=${encodeURIComponent(draft.trim())}`
+  })()
+
+  // Open in native messages: triggers sms: link, then logs as sent.
+  const handleOpenInMessages = async () => {
+    if (!smsHref) return
+    window.location.href = smsHref
+    // Give iOS a beat to hand off, then log
+    setTimeout(() => logOutbound('text'), 300)
+  }
+
+  const handleOpenInEmail = async () => {
+    if (!mailtoHref) return
+    window.location.href = mailtoHref
+    setTimeout(() => logOutbound('email'), 300)
+  }
+
+  const handleCopyDraft = async () => {
+    if (!draft.trim()) return
+    try {
+      await navigator.clipboard.writeText(draft.trim())
+      showToast('Copied — paste it wherever you message from')
+      logOutbound('manual')
+    } catch {
+      showToast('Could not copy — try selecting the text manually')
+    }
+  }
+
+  // Log an inbound reply manually — the agent pastes what the lead said back.
+  const [replyText, setReplyText] = useState('')
+  const [showReplyField, setShowReplyField] = useState(false)
+
+  const handleLogReply = async () => {
+    if (!replyText.trim() || !selectedLead) return
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    await supabase.from('messages').insert({
+      user_id: user.id,
+      lead_id: selectedLead.id,
+      direction: 'inbound',
+      channel: 'text',
+      content: replyText.trim(),
+      status: 'logged',
+    })
+    await supabase.from('leads').update({
+      last_contact_date: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq('id', selectedLead.id)
+    await supabase.from('interactions').insert({
+      user_id: user.id, lead_id: selectedLead.id,
+      interaction_type: 'text_received',
+      notes: `Reply logged: ${replyText.trim()}`,
+    })
+    setReplyText('')
+    setShowReplyField(false)
+    showToast('Reply logged')
+    loadMessages(selectedLead.id)
+    loadData()
+  }
+
+  // Paste an entire chat history — AI parses it into individual messages.
+  const [pasteHistory, setPasteHistory] = useState('')
+  const [showPasteField, setShowPasteField] = useState(false)
+  const [parsingHistory, setParsingHistory] = useState(false)
+
+  const handleParseHistory = async () => {
+    if (!pasteHistory.trim() || !selectedLead) return
+    setParsingHistory(true)
     try {
       const res = await fetch('/api/copilot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          leads: [{ ...selectedLead, days_since_contact: days }],
+          mode: 'parse_chat_history',
+          transcript: pasteHistory,
+          agentName: profile?.full_name || '',
+        }),
+      })
+      const data = await res.json()
+      const parsed = data.messages || []
+      if (parsed.length === 0) {
+        showToast('Could not parse any messages')
+        setParsingHistory(false)
+        return
+      }
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setParsingHistory(false); return }
+      // Insert in sequence so created_at preserves order
+      for (const m of parsed) {
+        await supabase.from('messages').insert({
+          user_id: user.id,
+          lead_id: selectedLead.id,
+          direction: m.direction,
+          channel: 'text',
+          content: m.content,
+          status: 'imported',
+        })
+      }
+      await supabase.from('leads').update({
+        last_contact_date: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', selectedLead.id)
+      setPasteHistory('')
+      setShowPasteField(false)
+      showToast(`Imported ${parsed.length} message${parsed.length === 1 ? '' : 's'}`)
+      loadMessages(selectedLead.id)
+    } catch (err) {
+      console.error('parse history failed:', err?.message)
+      showToast('Import failed')
+    }
+    setParsingHistory(false)
+  }
+
+  // Generic AI draft for the lead (uses full message history server-side).
+  const handleAIDraft = async () => {
+    if (!selectedLead) return
+    await runAIDraft({})
+  }
+
+  // Reply-to-this: drafts a response that explicitly addresses a specific inbound message.
+  const handleReplyToMessage = async (inboundMessage) => {
+    if (!selectedLead) return
+    await runAIDraft({ replyingTo: inboundMessage.content })
+  }
+
+  const runAIDraft = async ({ replyingTo } = {}) => {
+    setGenerating(true)
+    const days = fmt.daysSince(selectedLead.last_contact_date) ?? 0
+    // Pass full message history + optional "this is the message we're responding to" hint
+    const leadPayload = {
+      ...selectedLead,
+      days_since_contact: days,
+      recent_messages: messages.slice(-12).map(m => ({
+        direction: m.direction,
+        content: m.content,
+        created_at: m.created_at,
+      })),
+    }
+    if (replyingTo) leadPayload.replying_to = replyingTo
+    try {
+      const res = await fetch('/api/copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leads: [leadPayload],
           agentName: profile?.full_name || 'Alex',
         }),
       })
@@ -146,8 +273,8 @@ export default function MessagesPage() {
       )}
 
       <div className="brikk-msg-page-title" style={{ marginBottom: 16 }}>
-        <h1 style={{ ...type.pageTitle, margin: 0 }}>Messages</h1>
-        <p style={{ ...type.bodySub, margin: '4px 0 0' }}>Text leads directly. AI can draft a message for you.</p>
+        <h1 style={{ ...type.pageTitle, margin: 0 }}>Conversations</h1>
+        <p style={{ ...type.bodySub, margin: '4px 0 0' }}>Draft with AI, send from your own phone, keep every conversation logged.</p>
       </div>
 
       <style>{`
@@ -300,32 +427,59 @@ export default function MessagesPage() {
                     <div style={{ fontSize: 13, color: c.sub, marginBottom: 4 }}>No messages yet</div>
                     <div style={{ ...type.meta }}>Type below or generate an AI draft.</div>
                   </div>
-                ) : messages.map(m => (
-                  <div key={m.id} style={{
-                    display: 'flex',
-                    justifyContent: m.direction === 'outbound' ? 'flex-end' : 'flex-start',
-                    marginBottom: 10,
-                  }}>
-                    <div style={{
-                      maxWidth: '70%',
-                      padding: '10px 14px',
-                      borderRadius: m.direction === 'outbound' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
-                      background: m.direction === 'outbound' ? c.text : c.white,
-                      color: m.direction === 'outbound' ? c.white : c.text,
-                      border: m.direction === 'outbound' ? 'none' : `1px solid ${c.border}`,
+                ) : messages.map((m, idx) => {
+                  // Find the most recent inbound message to attach the Reply-with-AI button to
+                  const lastInboundIdx = messages.map((mm, i) => mm.direction === 'inbound' ? i : -1).filter(i => i >= 0).pop()
+                  const showReplyButton = m.direction === 'inbound' && idx === lastInboundIdx
+                  return (
+                    <div key={m.id} style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: m.direction === 'outbound' ? 'flex-end' : 'flex-start',
+                      marginBottom: 10,
                     }}>
-                      <div style={{ fontSize: 13, lineHeight: 1.55 }}>{m.content}</div>
-                      <div style={{ fontSize: 10.5, color: m.direction === 'outbound' ? 'rgba(255,255,255,0.55)' : c.dim, marginTop: 4, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                        <span>{new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
-                        {m.status && (
-                          <span style={{ color: m.status === 'failed' ? '#EF4444' : undefined }}>
-                            {m.status === 'sent' ? 'Sent' : m.status === 'received' ? 'Received' : m.status === 'failed' ? 'Failed' : m.status === 'logged' ? 'Logged' : m.status}
-                          </span>
-                        )}
+                      <div style={{
+                        maxWidth: '70%',
+                        padding: '10px 14px',
+                        borderRadius: m.direction === 'outbound' ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
+                        background: m.direction === 'outbound' ? c.text : c.white,
+                        color: m.direction === 'outbound' ? c.white : c.text,
+                        border: m.direction === 'outbound' ? 'none' : `1px solid ${c.border}`,
+                      }}>
+                        <div style={{ fontSize: 13, lineHeight: 1.55 }}>{m.content}</div>
+                        <div style={{ fontSize: 10.5, color: m.direction === 'outbound' ? 'rgba(255,255,255,0.55)' : c.dim, marginTop: 4, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                          <span>{new Date(m.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</span>
+                          {m.status && (
+                            <span style={{ color: m.status === 'failed' ? '#EF4444' : undefined }}>
+                              {messageStatusLabel(m.status)}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      {showReplyButton && (
+                        <button
+                          onClick={() => handleReplyToMessage(m)}
+                          disabled={generating}
+                          style={{
+                            marginTop: 6,
+                            background: c.purpleSoft,
+                            border: `1px solid ${c.purpleBorder}`,
+                            borderRadius: 999,
+                            padding: '4px 12px',
+                            fontSize: 11.5,
+                            fontWeight: 500,
+                            color: c.purple,
+                            cursor: generating ? 'wait' : 'pointer',
+                            fontFamily: 'inherit',
+                            opacity: generating ? 0.6 : 1,
+                          }}
+                        >
+                          {generating ? 'Drafting…' : '↪ Draft reply with Copilot'}
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
                 <div ref={messagesEndRef} />
               </div>
 
@@ -335,35 +489,115 @@ export default function MessagesPage() {
                 borderRadius: '0 0 8px 8px',
                 padding: '12px 16px',
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <button onClick={handleAIDraft} disabled={generating} style={{ ...btn.secondary, color: c.purple, borderColor: c.purpleBorder }}>
-                    {generating ? 'Drafting…' : 'Draft with Copilot'}
-                  </button>
+                {/* Tools row: AI draft + import history + log inbound reply */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button onClick={handleAIDraft} disabled={generating} style={{ ...btn.secondary, color: c.purple, borderColor: c.purpleBorder }}>
+                      {generating ? 'Drafting…' : 'Draft with Copilot'}
+                    </button>
+                    <button onClick={() => setShowReplyField(s => !s)} style={btn.secondary}>
+                      {showReplyField ? 'Cancel reply log' : '+ Log a reply'}
+                    </button>
+                    <button onClick={() => setShowPasteField(s => !s)} style={btn.ghost}>
+                      {showPasteField ? 'Cancel import' : 'Import chat history'}
+                    </button>
+                  </div>
                   {selectedLead.notes && (
                     <span style={{ ...type.meta, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       Notes: {selectedLead.notes}
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <textarea
-                    value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    placeholder={`Message ${selectedLead.name}…`}
-                    rows={2}
-                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-                    style={{ ...input, height: 'auto', padding: '10px 12px', resize: 'none', flex: 1, lineHeight: 1.5 }}
-                  />
+
+                {/* Optional: log inbound reply */}
+                {showReplyField && (
+                  <div style={{ background: c.bgInset, border: `1px solid ${c.border}`, borderRadius: 6, padding: 10, marginBottom: 10 }}>
+                    <div style={{ ...type.eyebrow, marginBottom: 6 }}>What did {selectedLead.name?.split(' ')[0] || 'they'} say?</div>
+                    <textarea
+                      value={replyText}
+                      onChange={e => setReplyText(e.target.value)}
+                      placeholder="Paste their reply…"
+                      rows={2}
+                      style={{ ...input, height: 'auto', padding: '8px 10px', resize: 'vertical', lineHeight: 1.5, width: '100%', background: c.white }}
+                    />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button onClick={handleLogReply} disabled={!replyText.trim()} style={{ ...btn.primary, opacity: !replyText.trim() ? 0.5 : 1 }}>Log reply</button>
+                      <button onClick={() => { setShowReplyField(false); setReplyText('') }} style={btn.ghost}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Optional: paste full chat history for AI parsing */}
+                {showPasteField && (
+                  <div style={{ background: c.bgInset, border: `1px solid ${c.border}`, borderRadius: 6, padding: 10, marginBottom: 10 }}>
+                    <div style={{ ...type.eyebrow, marginBottom: 6 }}>Paste an existing text exchange</div>
+                    <textarea
+                      value={pasteHistory}
+                      onChange={e => setPasteHistory(e.target.value)}
+                      placeholder="Paste a back-and-forth chat. AI will sort outbound vs inbound and log each message."
+                      rows={5}
+                      style={{ ...input, height: 'auto', padding: '8px 10px', resize: 'vertical', lineHeight: 1.5, width: '100%', background: c.white }}
+                    />
+                    <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                      <button onClick={handleParseHistory} disabled={!pasteHistory.trim() || parsingHistory} style={{ ...btn.primary, opacity: !pasteHistory.trim() || parsingHistory ? 0.5 : 1 }}>
+                        {parsingHistory ? 'Parsing…' : 'Import messages'}
+                      </button>
+                      <button onClick={() => { setShowPasteField(false); setPasteHistory('') }} style={btn.ghost}>Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick-reply templates — one tap fills the draft */}
+                <QuickReplyRow
+                  firstName={selectedLead.name?.split(' ')[0] || 'there'}
+                  agentName={profile?.full_name?.split(' ')[0] || ''}
+                  onPick={(text) => setDraft(text)}
+                />
+
+                {/* Compose textarea */}
+                <textarea
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  placeholder={`Draft a message for ${selectedLead.name?.split(' ')[0] || 'them'}…`}
+                  rows={3}
+                  style={{ ...input, height: 'auto', padding: '10px 12px', resize: 'none', width: '100%', lineHeight: 1.5 }}
+                />
+
+                {/* Send-from-your-phone action row */}
+                <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                  {selectedLead.phone && (
+                    <a
+                      href={smsHref || '#'}
+                      onClick={(e) => { if (!smsHref) e.preventDefault(); else handleOpenInMessages() }}
+                      style={{
+                        ...btn.primary,
+                        textDecoration: 'none',
+                        opacity: smsHref && !sending ? 1 : 0.5,
+                        pointerEvents: smsHref && !sending ? 'auto' : 'none',
+                      }}
+                    >Open in Messages</a>
+                  )}
+                  {selectedLead.email && (
+                    <a
+                      href={mailtoHref || '#'}
+                      onClick={(e) => { if (!mailtoHref) e.preventDefault(); else handleOpenInEmail() }}
+                      style={{
+                        ...btn.secondary,
+                        textDecoration: 'none',
+                        opacity: mailtoHref && !sending ? 1 : 0.5,
+                        pointerEvents: mailtoHref && !sending ? 'auto' : 'none',
+                      }}
+                    >Open in Email</a>
+                  )}
                   <button
-                    onClick={handleSend}
+                    onClick={handleCopyDraft}
                     disabled={!draft.trim() || sending}
-                    style={{ ...btn.primary, height: 'auto', alignSelf: 'flex-end', opacity: !draft.trim() || sending ? 0.5 : 1 }}
-                  >
-                    {sending ? '…' : 'Send'}
-                  </button>
+                    style={{ ...btn.secondary, opacity: !draft.trim() || sending ? 0.5 : 1 }}
+                  >Copy</button>
                 </div>
-                <div style={{ ...type.meta, marginTop: 6 }}>
-                  Enter to send · Shift+Enter for new line{selectedLead.phone ? ` · sent as SMS to ${selectedLead.phone}` : ''}
+
+                <div style={{ ...type.meta, marginTop: 8, lineHeight: 1.55 }}>
+                  Tapping <b>Open in Messages</b> opens your phone's text app with this pre-filled — you send it from your number, and Brikk auto-logs it here as a contact.
                 </div>
               </div>
             </>
@@ -372,6 +606,61 @@ export default function MessagesPage() {
       </div>
     </div>
   )
+}
+
+// Quick-reply templates — one-tap pre-fills for the most common short replies
+// agents send between full follow-ups. Personalized with the lead's first name and
+// the agent's first name when known.
+const QuickReplyRow = ({ firstName, agentName, onPick }) => {
+  const sig = agentName ? ` — ${agentName}` : ''
+  const templates = [
+    { label: 'On it', text: `On it — give me 15 minutes and I'll be back to you, ${firstName}.${sig}` },
+    { label: 'Let me check', text: `Let me check on that and circle back today, ${firstName}.${sig}` },
+    { label: 'Yes that works', text: `Yes — that works for me. Confirming now.${sig}` },
+    { label: 'Send address', text: `Sending the address now — give me a sec.${sig}` },
+    { label: 'Call you', text: `Easier on a quick call — what's a good 5-minute window today or tomorrow?${sig}` },
+    { label: 'New listing', text: `Hey ${firstName}, just got a new listing that fits what you're looking for. Want me to send the details?${sig}` },
+  ]
+  return (
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+      {templates.map((t, i) => (
+        <button
+          key={i}
+          onClick={() => onPick(t.text)}
+          style={{
+            background: 'transparent',
+            border: `1px solid ${c.border}`,
+            borderRadius: 999,
+            padding: '5px 12px',
+            fontSize: 11.5,
+            fontWeight: 500,
+            color: c.sub,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            whiteSpace: 'nowrap',
+          }}
+          title={t.text}
+        >{t.label}</button>
+      ))}
+    </div>
+  )
+}
+
+// Human-readable label for the various statuses we now log.
+const messageStatusLabel = (status) => {
+  switch (status) {
+    case 'sent':              return 'Sent'
+    case 'sent_via_phone':    return 'Sent from phone'
+    case 'sent_via_email':    return 'Sent via email'
+    case 'received':          return 'Received'
+    case 'failed':            return 'Failed'
+    case 'logged':            return 'Logged'
+    case 'logged_via_voice':  return 'Logged via voice'
+    case 'imported':          return 'Imported'
+    case 'copied':            return 'Copied'
+    case 'approved':          return 'Approved'
+    default:                  return status
+  }
 }
 
 const Avatar = ({ name, temperature }) => {

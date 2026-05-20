@@ -1,3 +1,6 @@
+// LEGACY — Brikk moved off Twilio in favor of native `sms:` deep links on the client.
+// This route is kept for compatibility but is no longer called by the app. If the env
+// vars are unset (the default), every call returns 503 and that's intentional.
 import { NextResponse } from 'next/server'
 import twilio from 'twilio'
 import { createClient } from '@supabase/supabase-js'

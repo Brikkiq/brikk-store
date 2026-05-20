@@ -10,13 +10,14 @@ export default function AppOverview() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [dismissedActions, setDismissedActions] = useState([])
-  const [recording, setRecording] = useState(false)
-  const [transcript, setTranscript] = useState('')
-  const [voiceProcessing, setVoiceProcessing] = useState(false)
-  const [voiceResult, setVoiceResult] = useState(null)
-  const [showVoice, setShowVoice] = useState(false)
 
-  useEffect(() => { loadData() }, [])
+  useEffect(() => {
+    loadData()
+    // Refresh when voice modal applies actions globally
+    const handler = () => loadData()
+    if (typeof window !== 'undefined') window.addEventListener('brikk:voice-saved', handler)
+    return () => { if (typeof window !== 'undefined') window.removeEventListener('brikk:voice-saved', handler) }
+  }, [])
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -51,120 +52,6 @@ export default function AppOverview() {
     loadData()
   }
 
-  // --- Voice-to-CRM ---
-  const startRecording = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { alert('Voice input is not supported in this browser.'); return }
-    const recognition = new SR()
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognition.lang = 'en-US'
-    let final = ''
-    recognition.onresult = (e) => {
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) final += e.results[i][0].transcript + ' '
-        else interim += e.results[i][0].transcript
-      }
-      setTranscript(final + interim)
-    }
-    recognition.onerror = (e) => { console.error('Speech error:', e.error); setRecording(false) }
-    recognition.onend = () => { if (recording) recognition.start() }
-    recognition.start()
-    setRecording(true)
-    setShowVoice(true)
-    setTranscript('')
-    setVoiceResult(null)
-    window._brikk_recognition = recognition
-    if (window.brikk?.haptic) window.brikk.haptic('medium')
-  }
-
-  const stopRecording = async () => {
-    if (window._brikk_recognition) {
-      window._brikk_recognition.onend = null
-      window._brikk_recognition.stop()
-    }
-    setRecording(false)
-    if (window.brikk?.haptic) window.brikk.haptic('success')
-    if (!transcript.trim()) return
-    setVoiceProcessing(true)
-    try {
-      const res = await fetch('/api/copilot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'voice_extract', transcript: transcript.trim() }),
-      })
-      const data = await res.json()
-      setVoiceResult(data.extraction || { raw: transcript.trim(), note: 'Could not extract structured data — saved as note.' })
-    } catch {
-      setVoiceResult({ raw: transcript.trim(), note: 'AI unavailable — saved as raw note.' })
-    }
-    setVoiceProcessing(false)
-  }
-
-  const saveVoiceNote = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const matchName = voiceResult?.lead_name || voiceResult?.new_lead_name || null
-    let matched = null
-    if (matchName) {
-      const q = matchName.toLowerCase().trim()
-      matched = leads.find(l => {
-        const ln = (l.name || '').toLowerCase()
-        return ln.includes(q) || q.includes(ln) || ln.split(' ')[0] === q.split(' ')[0]
-      })
-    }
-    const newNote = voiceResult?.notes || voiceResult?.raw || transcript
-
-    if (matched) {
-      const existing = matched.notes || ''
-      const update = {
-        last_contact_date: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        notes: existing
-          ? `${existing}\n\n[Voice ${new Date().toLocaleDateString()}] ${newNote}`
-          : `[Voice ${new Date().toLocaleDateString()}] ${newNote}`,
-      }
-      if (voiceResult?.price && !matched.price_range) update.price_range = voiceResult.price
-      if (voiceResult?.stage) update.stage = voiceResult.stage
-      if (voiceResult?.temperature) update.temperature = voiceResult.temperature
-      await supabase.from('leads').update(update).eq('id', matched.id)
-      await supabase.from('interactions').insert({
-        user_id: user.id, lead_id: matched.id,
-        interaction_type: 'voice_note', notes: newNote,
-      })
-      setVoiceResult(prev => ({ ...prev, saved: true, savedTo: matched.name }))
-    } else if (matchName) {
-      await supabase.from('leads').insert({
-        user_id: user.id,
-        name: matchName,
-        phone: voiceResult?.phone || '',
-        notes: `[Voice ${new Date().toLocaleDateString()}] ${newNote}`,
-        source: 'Voice Note',
-        temperature: voiceResult?.temperature || 'warm',
-        stage: voiceResult?.stage || 'New Lead',
-        lead_type: voiceResult?.lead_type || 'Buyer',
-        price_range: voiceResult?.price || '',
-        last_contact_date: new Date().toISOString(),
-      })
-      setVoiceResult(prev => ({ ...prev, saved: true, savedTo: matchName + ' (new)' }))
-    } else {
-      await supabase.from('interactions').insert({
-        user_id: user.id,
-        interaction_type: 'voice_note',
-        notes: `[Voice ${new Date().toLocaleDateString()}] ${transcript}`,
-      })
-      setVoiceResult(prev => ({ ...prev, saved: true, savedTo: 'General notes' }))
-    }
-
-    if (window.brikk?.haptic) window.brikk.haptic('success')
-    loadData()
-    setTimeout(() => {
-      setShowVoice(false); setTranscript(''); setVoiceResult(null)
-    }, 1400)
-  }
-
   // --- Build action list ---
   const actions = []
 
@@ -182,7 +69,7 @@ export default function AppOverview() {
         primaryLabel: 'Log contact',
         primaryFn: () => handleLogContact(l.id),
         secondaryHref: '/app/messages',
-        secondaryLabel: 'Message',
+        secondaryLabel: 'Open conversation',
       })
     } else if (l.temperature === 'warm' && days >= 3) {
       actions.push({
@@ -196,7 +83,7 @@ export default function AppOverview() {
         primaryLabel: 'Log contact',
         primaryFn: () => handleLogContact(l.id),
         secondaryHref: '/app/messages',
-        secondaryLabel: 'Message',
+        secondaryLabel: 'Open conversation',
       })
     }
   })
@@ -304,42 +191,6 @@ export default function AppOverview() {
         </div>
       </section>
 
-      {/* Floating voice button */}
-      {!showVoice && (
-        <button
-          onClick={startRecording}
-          aria-label="Record voice note"
-          style={{
-            position: 'fixed', bottom: 92, right: 24,
-            width: 48, height: 48, borderRadius: '50%',
-            background: c.text, border: 'none', cursor: 'pointer',
-            boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-            <line x1="12" y1="19" x2="12" y2="23" />
-            <line x1="8" y1="23" x2="16" y2="23" />
-          </svg>
-        </button>
-      )}
-
-      {/* Voice modal */}
-      {showVoice && (
-        <VoiceModal
-          recording={recording}
-          transcript={transcript}
-          processing={voiceProcessing}
-          result={voiceResult}
-          leads={leads}
-          onStart={startRecording}
-          onStop={stopRecording}
-          onSave={saveVoiceNote}
-          onClose={() => { setShowVoice(false); setTranscript(''); setVoiceResult(null) }}
-        />
-      )}
     </div>
   )
 }
@@ -429,133 +280,4 @@ const QuickLink = ({ href, label, sub }) => (
   </a>
 )
 
-const VoiceModal = ({ recording, transcript, processing, result, leads, onStart, onStop, onSave, onClose }) => (
-  <div
-    onClick={e => { if (e.target === e.currentTarget && !recording) onClose() }}
-    style={{
-      position: 'fixed', inset: 0, background: 'rgba(20,20,18,0.5)',
-      zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-      padding: 20,
-    }}
-  >
-    <div style={{
-      background: c.white, borderRadius: 12,
-      padding: '24px 22px', width: '100%', maxWidth: 460,
-      maxHeight: '78vh', overflow: 'auto',
-      marginBottom: 24,
-      border: `1px solid ${c.border}`,
-      boxShadow: '0 10px 40px rgba(20,20,18,0.18)',
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Voice note</div>
-          <div style={{ ...type.meta }}>{recording ? 'Listening…' : 'Review and save'}</div>
-        </div>
-        {!recording && (
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 18, color: c.dim, cursor: 'pointer' }}>×</button>
-        )}
-      </div>
-
-      {recording && (
-        <div style={{ textAlign: 'center', padding: '20px 0' }}>
-          <div style={{
-            width: 60, height: 60, borderRadius: '50%',
-            background: c.redSoft, border: `2px solid ${c.red}`,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-            marginBottom: 14,
-            animation: 'brikkPulse 1.2s ease-in-out infinite',
-          }}>
-            <div style={{ width: 16, height: 16, borderRadius: 3, background: c.red }} />
-          </div>
-          <style>{`@keyframes brikkPulse{0%,100%{transform:scale(1);opacity:0.7}50%{transform:scale(1.08);opacity:1}}`}</style>
-          <div>
-            <button onClick={onStop} style={{ ...btn.primary, background: c.red, border: 'none' }}>Stop</button>
-          </div>
-        </div>
-      )}
-
-      {transcript && (
-        <div style={{
-          background: c.bgInset, border: `1px solid ${c.border}`,
-          borderRadius: 6, padding: '12px 14px', marginBottom: 12,
-        }}>
-          <div style={type.eyebrow}>Transcript</div>
-          <div style={{ ...type.body, fontSize: 13, marginTop: 6 }}>{transcript}</div>
-        </div>
-      )}
-
-      {processing && (
-        <div style={{ textAlign: 'center', padding: '12px 0', fontSize: 13, color: c.dim }}>
-          Extracting lead details…
-        </div>
-      )}
-
-      {result && !processing && (
-        <div style={{ marginBottom: 12 }}>
-          {result.saved ? (
-            <div style={{ ...card, padding: '18px 16px', textAlign: 'center', background: c.greenSoft, borderColor: c.greenBorder }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>Saved</div>
-              <div style={{ ...type.bodySub, marginTop: 2 }}>Updated: {result.savedTo}</div>
-            </div>
-          ) : (
-            <>
-              {(result.lead_name || result.new_lead_name) && (
-                <div style={{ ...card, padding: '14px 16px', marginBottom: 10 }}>
-                  <div style={type.eyebrow}>Extracted</div>
-                  {(() => {
-                    const q = (result.lead_name || result.new_lead_name || '').toLowerCase().trim()
-                    const match = leads.find(l => {
-                      const ln = (l.name || '').toLowerCase()
-                      return ln.includes(q) || q.includes(ln) || ln.split(' ')[0] === q.split(' ')[0]
-                    })
-                    return match ? (
-                      <div style={{ marginTop: 8 }}>
-                        <div style={{ ...type.meta, color: c.green }}>Matched existing lead</div>
-                        <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{match.name}</div>
-                        <div style={{ ...type.meta, marginTop: 2 }}>
-                          {[match.temperature, match.stage, match.source].filter(Boolean).join(' · ')}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ marginTop: 8 }}>
-                        <div style={{ ...type.meta, color: c.amber }}>New lead will be created</div>
-                        <div style={{ fontSize: 14, fontWeight: 600, marginTop: 2 }}>{result.lead_name || result.new_lead_name}</div>
-                      </div>
-                    )
-                  })()}
-                  {result.action && <div style={{ ...type.bodySub, marginTop: 6 }}>{result.action}</div>}
-                  {result.notes && <div style={{ ...type.bodySub, marginTop: 6 }}>{result.notes}</div>}
-                </div>
-              )}
-              {!(result.lead_name || result.new_lead_name) && result.raw && (
-                <div style={{ ...card, padding: '14px 16px', marginBottom: 10 }}>
-                  <div style={type.eyebrow}>Voice note</div>
-                  <div style={{ ...type.bodySub, marginTop: 6 }}>{result.raw}</div>
-                  <div style={{ ...type.meta, marginTop: 6, fontStyle: 'italic' }}>No lead name detected — will save as general note.</div>
-                </div>
-              )}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={onSave} style={{ ...btn.primary, flex: 1 }}>Save to CRM</button>
-                <button onClick={onClose} style={btn.secondary}>Discard</button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {!recording && !processing && !result && transcript && (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={onStart} style={{ ...btn.secondary, flex: 1 }}>Record again</button>
-          <button onClick={onStop} style={{ ...btn.primary, flex: 1 }}>Process</button>
-        </div>
-      )}
-
-      {!recording && !transcript && (
-        <div style={{ textAlign: 'center', padding: '8px 0' }}>
-          <button onClick={onStart} style={btn.primary}>Start recording</button>
-          <div style={{ ...type.meta, marginTop: 8 }}>Speak naturally — AI will extract lead details.</div>
-        </div>
-      )}
-    </div>
-  </div>
-)
+// Voice modal lives in lib/Voice.js and is mounted globally in app/app/layout.js.

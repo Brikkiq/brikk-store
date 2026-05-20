@@ -76,21 +76,78 @@ export default function CopilotPage() {
     setGenerating(false)
   }
 
-  const handleApprove = async (draft) => {
+  // Log a draft as sent. Used by all three send paths (sms / email / copy / approve-only).
+  // `via` is one of: 'text' | 'email' | 'manual' | 'approve_only'
+  const logDraftAsSent = async (draft, via) => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    const channel = via === 'email' ? 'email'
+                  : via === 'manual' ? 'manual'
+                  : 'text'
+    const status = via === 'text' ? 'sent_via_phone'
+                 : via === 'email' ? 'sent_via_email'
+                 : via === 'manual' ? 'copied'
+                 : 'approved'
+    await supabase.from('messages').insert({
+      user_id: user.id,
+      lead_id: draft.lead_id,
+      direction: 'outbound',
+      channel,
+      content: draft.draft,
+      status,
+    })
     await supabase.from('interactions').insert({
       user_id: user.id, lead_id: draft.lead_id,
-      interaction_type: draft.channel === 'Text' ? 'text' : 'email',
-      notes: `Copilot draft approved: ${draft.draft}`,
+      interaction_type: channel === 'email' ? 'email' : 'text',
+      notes: `Copilot draft ${via === 'approve_only' ? 'approved' : 'sent (' + via + ')'}: ${draft.draft}`,
     })
     await supabase.from('leads').update({
       last_contact_date: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }).eq('id', draft.lead_id)
-    setApprovedIds(p => [...p, draft.lead_id])
-    showToast('Approved — contact logged')
+    setApprovedIds(p => p.includes(draft.lead_id) ? p : [...p, draft.lead_id])
     if (window.brikk?.haptic) window.brikk.haptic('success')
+  }
+
+  // Open native Messages app pre-filled with the draft. Auto-logs after a short delay.
+  const handleSendViaSMS = async (draft, leadPhone) => {
+    if (!leadPhone) {
+      showToast('No phone on file — copy the draft instead')
+      return
+    }
+    const phone = String(leadPhone).replace(/[^0-9+]/g, '')
+    const isIphone = typeof navigator !== 'undefined' && /iPhone|iPad/.test(navigator.userAgent)
+    const href = `sms:${phone}${isIphone ? '&' : '?'}body=${encodeURIComponent(draft.draft)}`
+    window.location.href = href
+    setTimeout(() => {
+      logDraftAsSent(draft, 'text')
+      showToast(`Sent to ${draft.lead_name} — logged`)
+    }, 300)
+  }
+
+  const handleSendViaEmail = async (draft, leadEmail) => {
+    if (!leadEmail) { showToast('No email on file'); return }
+    const href = `mailto:${leadEmail}?body=${encodeURIComponent(draft.draft)}`
+    window.location.href = href
+    setTimeout(() => {
+      logDraftAsSent(draft, 'email')
+      showToast(`Sent to ${draft.lead_name} — logged`)
+    }, 300)
+  }
+
+  const handleCopyDraft = async (draft) => {
+    try {
+      await navigator.clipboard.writeText(draft.draft)
+      await logDraftAsSent(draft, 'manual')
+      showToast('Copied — paste anywhere, contact logged')
+    } catch {
+      showToast('Could not copy')
+    }
+  }
+
+  const handleApproveOnly = async (draft) => {
+    await logDraftAsSent(draft, 'approve_only')
+    showToast('Approved — contact logged')
   }
 
   const handleSkip = (id) => setSkippedIds(p => [...p, id])
@@ -171,20 +228,29 @@ export default function CopilotPage() {
             {pendingCount > 0 ? 'Drafts to review' : 'All drafts approved'}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {visible.map(d => (
-              <DraftCard
-                key={d.lead_id} draft={d}
-                approved={approvedIds.includes(d.lead_id)}
-                isEditing={editingId === d.lead_id}
-                editText={editText}
-                setEditText={setEditText}
-                onApprove={() => handleApprove(d)}
-                onSkip={() => handleSkip(d.lead_id)}
-                onEdit={() => handleEdit(d)}
-                onSaveEdit={() => handleSaveEdit(d)}
-                onCancelEdit={() => setEditingId(null)}
-              />
-            ))}
+            {visible.map(d => {
+              // Pull live phone/email from the leads list so deep links work
+              const fullLead = leads.find(l => l.id === d.lead_id)
+              return (
+                <DraftCard
+                  key={d.lead_id} draft={d}
+                  leadPhone={fullLead?.phone}
+                  leadEmail={fullLead?.email}
+                  approved={approvedIds.includes(d.lead_id)}
+                  isEditing={editingId === d.lead_id}
+                  editText={editText}
+                  setEditText={setEditText}
+                  onSendSMS={() => handleSendViaSMS(d, fullLead?.phone)}
+                  onSendEmail={() => handleSendViaEmail(d, fullLead?.email)}
+                  onCopy={() => handleCopyDraft(d)}
+                  onApproveOnly={() => handleApproveOnly(d)}
+                  onSkip={() => handleSkip(d.lead_id)}
+                  onEdit={() => handleEdit(d)}
+                  onSaveEdit={() => handleSaveEdit(d)}
+                  onCancelEdit={() => setEditingId(null)}
+                />
+              )
+            })}
           </div>
         </section>
       )}
@@ -207,7 +273,12 @@ const EmptyCard = ({ title, body, children }) => (
   </div>
 )
 
-const DraftCard = ({ draft, approved, isEditing, editText, setEditText, onApprove, onSkip, onEdit, onSaveEdit, onCancelEdit }) => {
+const DraftCard = ({
+  draft, leadPhone, leadEmail, approved,
+  isEditing, editText, setEditText,
+  onSendSMS, onSendEmail, onCopy, onApproveOnly,
+  onSkip, onEdit, onSaveEdit, onCancelEdit,
+}) => {
   const urgencyChip = draft.urgency === 'high' ? chipFor('hot')
                     : draft.urgency === 'medium' ? chipFor('warm')
                     : chipFor('neutral')
@@ -281,19 +352,36 @@ const DraftCard = ({ draft, approved, isEditing, editText, setEditText, onApprov
       )}
 
       {!isEditing && !approved && (
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={onApprove} style={{ ...btn.primary, background: c.green, border: `1px solid ${c.green}` }}>Approve & log</button>
-          <button onClick={onEdit} style={btn.secondary}>Edit</button>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {leadPhone && (
+            <button
+              onClick={onSendSMS}
+              style={{ ...btn.primary, background: c.green, border: `1px solid ${c.green}` }}
+            >
+              Send via Messages
+            </button>
+          )}
+          {leadEmail && (
+            <button onClick={onSendEmail} style={btn.secondary}>
+              Send via Email
+            </button>
+          )}
+          <button onClick={onCopy} style={btn.secondary}>Copy</button>
+          <button onClick={onApproveOnly} style={btn.ghost}>Log only</button>
+          <button onClick={onEdit} style={btn.ghost}>Edit</button>
           <button onClick={onSkip} style={btn.ghost}>Skip</button>
         </div>
       )}
 
       {approved && (
-        <div style={{ ...type.meta, color: c.green, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ ...type.meta, color: c.green, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
-          This contact was logged. Copy the draft above and send it however you prefer (text, email, in-person).
+          Logged in this lead's conversation history.
+          <button onClick={onCopy} style={{ ...btn.ghost, height: 26, padding: '2px 8px', fontSize: 12, marginLeft: 4 }}>
+            Copy again
+          </button>
         </div>
       )}
     </div>

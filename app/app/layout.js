@@ -5,27 +5,40 @@ import { supabase } from '@/lib/supabase'
 import { c } from '@/lib/design'
 import { Logo } from '@/lib/Logo'
 import { ensureReferralCode } from '@/lib/referralCode'
+import { VoiceButton } from '@/lib/Voice'
 
 const navItems = [
-  { label: 'Today',     href: '/app',           key: 'home' },
-  { label: 'Copilot',   href: '/app/copilot',   key: 'copilot' },
-  { label: 'Leads',     href: '/app/leads',     key: 'leads' },
-  { label: 'Deals',     href: '/app/deals',     key: 'deals' },
-  { label: 'Calendar',  href: '/app/calendar',  key: 'calendar' },
-  { label: 'Messages',  href: '/app/messages',  key: 'messages' },
-  { label: 'Marketing', href: '/app/marketing', key: 'marketing' },
+  { label: 'Today',         href: '/app',           key: 'home' },
+  { label: 'Copilot',       href: '/app/copilot',   key: 'copilot' },
+  { label: 'Leads',         href: '/app/leads',     key: 'leads' },
+  { label: 'Deals',         href: '/app/deals',     key: 'deals' },
+  { label: 'Calendar',      href: '/app/calendar',  key: 'calendar' },
+  { label: 'Conversations', href: '/app/messages',  key: 'messages' },
+  { label: 'Marketing',     href: '/app/marketing', key: 'marketing' },
 ]
 
-// Mobile bottom-bar tabs. Calendar is reachable from the Today dashboard.
+// Mobile bottom bar — all 8 sections present so nothing is hidden.
+// We use 8 tabs on a slightly taller bar; labels are short to keep them legible.
 const mobileNavItems = [
   { label: 'Today',     href: '/app',           key: 'home' },
   { label: 'Copilot',   href: '/app/copilot',   key: 'copilot' },
   { label: 'Leads',     href: '/app/leads',     key: 'leads' },
   { label: 'Deals',     href: '/app/deals',     key: 'deals' },
-  { label: 'Messages',  href: '/app/messages',  key: 'messages' },
-  { label: 'Marketing', href: '/app/marketing', key: 'marketing' },
+  { label: 'Calendar',  href: '/app/calendar',  key: 'calendar' },
+  { label: 'Chats',     href: '/app/messages',  key: 'messages' },
+  { label: 'ROI',       href: '/app/marketing', key: 'marketing' },
   { label: 'Settings',  href: '/app/settings',  key: 'settings' },
 ]
+
+// If the current URL points at a single lead (e.g. /app/leads/abcd-1234),
+// surface that lead's identity so the voice modal can pre-tag actions.
+// The actual name resolution happens client-side in the voice modal via leads list.
+function detectLeadFromPath(path) {
+  if (!path) return null
+  const m = path.match(/^\/app\/leads\/([^\/?#]+)\/?$/)
+  if (m && m[1] && m[1] !== 'new') return { id: m[1] }
+  return null
+}
 
 const Icon = ({ name, size = 18 }) => {
   const props = {
@@ -463,17 +476,20 @@ export default function AppLayout({ children }) {
         </main>
       </div>
 
-      {/* Mobile bottom tab bar */}
+      {/* Floating voice button — available on every signed-in page */}
+      <VoiceButton leadHint={detectLeadFromPath(currentPath)} />
+
+      {/* Mobile bottom tab bar — bigger, more comfortable thumb target */}
       <nav
         className="brikk-mobile-tabbar"
         style={{
           display: 'none',
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          background: 'rgba(255,255,255,0.95)',
-          backdropFilter: 'blur(18px)',
-          WebkitBackdropFilter: 'blur(18px)',
+          background: 'rgba(255,255,255,0.96)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           borderTop: `1px solid ${c.border}`,
-          padding: '6px 4px calc(6px + env(safe-area-inset-bottom, 0px))',
+          padding: '10px 2px calc(10px + env(safe-area-inset-bottom, 0px))',
           zIndex: 100,
           justifyContent: 'space-around',
           alignItems: 'center',
@@ -490,22 +506,38 @@ export default function AppLayout({ children }) {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: 2,
+                gap: 4,
                 padding: '6px 0',
                 textDecoration: 'none',
                 color: active ? c.text : c.dim,
                 minWidth: 0,
+                position: 'relative',
               }}
             >
-              <Icon name={n.key} size={17} />
+              {/* Active indicator pill */}
+              <div style={{
+                width: active ? 28 : 0,
+                height: active ? 24 : 0,
+                borderRadius: 8,
+                background: active ? c.bgInset : 'transparent',
+                position: 'absolute',
+                top: 2,
+                transition: 'width 0.18s ease',
+                zIndex: 0,
+              }} />
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                <Icon name={n.key} size={20} />
+              </div>
               <span style={{
-                fontSize: 9,
+                fontSize: 10,
                 fontWeight: active ? 600 : 500,
                 letterSpacing: '0',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 maxWidth: '100%',
+                position: 'relative',
+                zIndex: 1,
               }}>
                 {n.label}
               </span>
