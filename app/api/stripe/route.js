@@ -47,8 +47,12 @@ export async function POST(request) {
         'payment_method_types[0]': 'card',
         allow_promotion_codes: 'true',
         billing_address_collection: 'auto',
+        // Plan + user metadata is duplicated onto the subscription so the webhook
+        // can identify the plan even if the checkout session has been garbage-collected.
         'metadata[plan]': plan,
         'metadata[userId]': userId || '',
+        'subscription_data[metadata][plan]': plan,
+        'subscription_data[metadata][userId]': userId || '',
       }).toString(),
     })
 

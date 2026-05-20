@@ -24,12 +24,16 @@ ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS plan_tier text DEFAULT 'team';
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS owner_id uuid;
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS max_seats integer DEFAULT 5;
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS stripe_customer_id text;
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_code ON public.teams(team_code);
 CREATE INDEX IF NOT EXISTS idx_teams_owner ON public.teams(owner_id);
+-- One Stripe subscription can back at most one team
+CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_stripe_sub
+  ON public.teams(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
 
 -- =====================================================================
 -- PROFILES
@@ -53,6 +57,10 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS brokerage text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS team_id uuid;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS team_role text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_plan text;       -- 'pro' | 'team' | 'agency' | NULL
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS subscription_status text;     -- 'trialing' | 'active' | 'past_due' | 'canceled' | NULL
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 

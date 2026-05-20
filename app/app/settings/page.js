@@ -755,8 +755,25 @@ const TeamTab = ({ user, showToast }) => {
 
   // ---- Owner view ----
   if (role === 'owner') {
+    const unlinked = !team.stripe_subscription_id && team.plan_tier !== 'agency'
     return (
       <>
+        {unlinked && (
+          <div style={{
+            background: c.amberSoft, border: `1px solid ${c.amberBorder}`,
+            borderRadius: 6, padding: '12px 14px', marginBottom: 12,
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+          }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: c.amber }}>This team isn't linked to a paid subscription</div>
+              <div style={{ ...type.bodySub, marginTop: 2 }}>
+                Subscribe to the Team plan to keep your team active. Until then your members still have access, but billing isn't covered.
+              </div>
+            </div>
+            <a href="?tab=billing" onClick={(e) => { e.preventDefault(); window.history.replaceState({}, '', '?tab=billing'); window.dispatchEvent(new Event('popstate')) }}
+               style={{ ...btn.primary, textDecoration: 'none', flexShrink: 0 }}>Subscribe</a>
+          </div>
+        )}
         <Section title={team.name} description={`${team.plan_tier === 'agency' ? 'Agency' : 'Team'} plan · ${members.length} of ${team.max_seats} seats used`}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ ...inputLabel, marginBottom: 6 }}>Team code</div>
