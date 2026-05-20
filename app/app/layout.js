@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { c } from '@/lib/design'
 import { Logo } from '@/lib/Logo'
+import { ensureReferralCode } from '@/lib/referralCode'
 
 const navItems = [
   { label: 'Today',     href: '/app',           key: 'home' },
@@ -15,14 +16,15 @@ const navItems = [
   { label: 'Marketing', href: '/app/marketing', key: 'marketing' },
 ]
 
-// Mobile bottom-bar tabs. Calendar and Marketing are reachable from the Today dashboard.
+// Mobile bottom-bar tabs. Calendar is reachable from the Today dashboard.
 const mobileNavItems = [
-  { label: 'Today',    href: '/app',           key: 'home' },
-  { label: 'Copilot',  href: '/app/copilot',   key: 'copilot' },
-  { label: 'Leads',    href: '/app/leads',     key: 'leads' },
-  { label: 'Deals',    href: '/app/deals',     key: 'deals' },
-  { label: 'Messages', href: '/app/messages',  key: 'messages' },
-  { label: 'Settings', href: '/app/settings',  key: 'settings' },
+  { label: 'Today',     href: '/app',           key: 'home' },
+  { label: 'Copilot',   href: '/app/copilot',   key: 'copilot' },
+  { label: 'Leads',     href: '/app/leads',     key: 'leads' },
+  { label: 'Deals',     href: '/app/deals',     key: 'deals' },
+  { label: 'Messages',  href: '/app/messages',  key: 'messages' },
+  { label: 'Marketing', href: '/app/marketing', key: 'marketing' },
+  { label: 'Settings',  href: '/app/settings',  key: 'settings' },
 ]
 
 const Icon = ({ name, size = 18 }) => {
@@ -57,10 +59,12 @@ export default function AppLayout({ children }) {
   const [currentPath, setCurrentPath] = useState('/app')
   const [banner, setBanner] = useState(null)
   const [bannerDismissed, setBannerDismissed] = useState(false)
+  const [liveAlerts, setLiveAlerts] = useState([])
   const touchStartY = useRef(0)
   const isPulling = useRef(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const channelRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -72,7 +76,59 @@ export default function AppLayout({ children }) {
       if (cancelled) return
       setProfile(prof || null)
       setLoading(false)
+      // Make sure this user has a referral code. Cheap if they already do.
+      ensureReferralCode(user.id).catch(err => console.warn('referral code ensure failed', err?.message))
       checkBanner(user.id).catch(err => console.warn('banner check failed', err?.message))
+
+      // If they signed up with a pending team code, redeem it now.
+      try {
+        const pending = typeof window !== 'undefined'
+          ? localStorage.getItem('brikk-pending-team-code')
+          : null
+        if (pending) {
+          const session = (await supabase.auth.getSession()).data.session
+          if (session?.access_token) {
+            fetch('/api/team', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ action: 'join', team_code: pending }),
+            }).then(() => {
+              localStorage.removeItem('brikk-pending-team-code')
+            }).catch(() => {})
+          }
+        }
+      } catch {}
+
+      // Live alert: ping the agent whenever a new lead lands.
+      // Supabase Realtime — INSERT events on the leads table, filtered by user_id.
+      channelRef.current = supabase
+        .channel(`leads-inserts-${user.id}`)
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'leads', filter: `user_id=eq.${user.id}` },
+          (payload) => {
+            const row = payload?.new
+            if (!row) return
+            // Only alert on inbound lead capture; suppress manual adds the user just did.
+            const isInbound = row.source === 'Referral Link' || row.source === 'Voice Note'
+            if (!isInbound) return
+            const tone = row.source === 'Referral Link' ? 'success' : 'info'
+            const msg = row.source === 'Referral Link'
+              ? `New lead: ${row.name} just filled out your link`
+              : `New lead: ${row.name}`
+            const alertId = row.id || Math.random().toString(36)
+            setLiveAlerts(prev => [...prev, { id: alertId, msg, tone }])
+            // Auto-dismiss after 8s
+            setTimeout(() => {
+              setLiveAlerts(prev => prev.filter(a => a.id !== alertId))
+            }, 8000)
+            if (window.brikk?.haptic) window.brikk.haptic('success')
+          }
+        )
+        .subscribe()
     })
     if (typeof window !== 'undefined') {
       setCurrentPath(window.location.pathname)
@@ -97,7 +153,14 @@ export default function AppLayout({ children }) {
     const t = setTimeout(() => {
       if (window.brikk?.requestPushPermission) window.brikk.requestPushPermission()
     }, 15000)
-    return () => { cancelled = true; clearTimeout(t) }
+    return () => {
+      cancelled = true
+      clearTimeout(t)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
   }, [])
 
   const checkBanner = async (userId) => {
@@ -218,6 +281,12 @@ export default function AppLayout({ children }) {
         @media (max-width: 900px) {
           .brikk-page-padding { padding: 16px 16px 96px !important; }
         }
+        /* Messages conversation takes over the whole screen on mobile */
+        @media (max-width: 900px) {
+          body.brikk-msg-fullscreen .brikk-mobile-top { display: none !important; }
+          body.brikk-msg-fullscreen .brikk-mobile-tabbar { display: none !important; }
+          body.brikk-msg-fullscreen .brikk-page-padding { padding: 0 !important; max-width: 100% !important; }
+        }
       `}</style>
 
       {/* Sidebar (desktop) */}
@@ -303,6 +372,42 @@ export default function AppLayout({ children }) {
       >
         <Logo size={18} />
       </header>
+
+      {/* Live alerts (Supabase Realtime — new leads) */}
+      {liveAlerts.length > 0 && (
+        <div style={{
+          position: 'fixed', top: 16, right: 16, zIndex: 300,
+          display: 'flex', flexDirection: 'column', gap: 8,
+          maxWidth: 340,
+        }}>
+          {liveAlerts.map(a => (
+            <div
+              key={a.id}
+              role="status"
+              style={{
+                background: a.tone === 'success' ? c.greenSoft : c.indigoSoft,
+                border: `1px solid ${a.tone === 'success' ? c.greenBorder : c.indigoBorder}`,
+                color: a.tone === 'success' ? c.green : c.indigo,
+                borderRadius: 8, padding: '12px 14px',
+                fontSize: 13, fontWeight: 500,
+                boxShadow: '0 6px 24px rgba(20,20,18,0.10)',
+                display: 'flex', alignItems: 'center', gap: 10,
+                animation: 'brikkFade 0.22s ease-out',
+              }}
+            >
+              <span style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: a.tone === 'success' ? c.green : c.indigo,
+                flexShrink: 0,
+              }} />
+              <span style={{ flex: 1, color: c.text }}>{a.msg}</span>
+              <a href="/app/leads" style={{ fontSize: 12, fontWeight: 600, color: a.tone === 'success' ? c.green : c.indigo, textDecoration: 'none' }}>
+                Open →
+              </a>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Main */}
       <div className="brikk-main" style={{ flex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -392,11 +497,11 @@ export default function AppLayout({ children }) {
                 minWidth: 0,
               }}
             >
-              <Icon name={n.key} size={18} />
+              <Icon name={n.key} size={17} />
               <span style={{
-                fontSize: 9.5,
+                fontSize: 9,
                 fontWeight: active ? 600 : 500,
-                letterSpacing: '0.005em',
+                letterSpacing: '0',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',

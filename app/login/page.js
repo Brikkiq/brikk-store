@@ -12,6 +12,8 @@ export default function Login() {
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [brokerage, setBrokerage] = useState('')
+  const [teamCode, setTeamCode] = useState('')
+  const [showTeamCode, setShowTeamCode] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
@@ -64,6 +66,15 @@ export default function Login() {
         phone: phone || null, brokerage: brokerage || null,
       }).eq('id', data.user.id)
       if (profileErr) console.warn('Profile update failed:', profileErr.message)
+    }
+
+    // Pending team join — applied after the user confirms their email and signs in for the first time.
+    if (teamCode.trim()) {
+      try {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('brikk-pending-team-code', teamCode.trim().toUpperCase())
+        }
+      } catch {}
     }
 
     setShowConfirmation(true)
@@ -175,6 +186,28 @@ export default function Login() {
               <Field label="Brokerage">
                 <input value={brokerage} onChange={e => setBrokerage(e.target.value)} onKeyDown={onKey} placeholder="Keller Williams, eXp…" style={input} />
               </Field>
+              {!showTeamCode ? (
+                <button
+                  type="button"
+                  onClick={() => setShowTeamCode(true)}
+                  style={{
+                    background: 'none', border: 'none',
+                    color: c.sub, fontSize: 12, fontWeight: 500,
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    padding: 0, marginBottom: 12, textAlign: 'left',
+                  }}
+                >+ I have a team code</button>
+              ) : (
+                <Field label="Team code">
+                  <input
+                    value={teamCode}
+                    onChange={e => setTeamCode(e.target.value.toUpperCase())}
+                    onKeyDown={onKey}
+                    placeholder="TEAM-XXXX-YYYY"
+                    style={{ ...input, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.04em' }}
+                  />
+                </Field>
+              )}
             </>
           )}
 

@@ -100,7 +100,10 @@ export default function CopilotPage() {
     setEditingId(null); setEditText('')
   }
 
-  const pending = drafts.filter(d => !approvedIds.includes(d.lead_id) && !skippedIds.includes(d.lead_id))
+  // Show every non-skipped draft. Approved ones stay in place with a success state
+  // so the user knows the action landed without the card jumping around.
+  const visible = drafts.filter(d => !skippedIds.includes(d.lead_id))
+  const pendingCount = visible.filter(d => !approvedIds.includes(d.lead_id)).length
   const eligibleCount = leads.filter(needsFollowUp).length
 
   if (loading) return <div style={{ padding: 60, textAlign: 'center', color: c.dim, fontSize: 13 }}>Loading Copilot…</div>
@@ -135,7 +138,7 @@ export default function CopilotPage() {
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
         <KPI label="Need follow-up" value={eligibleCount} accent={eligibleCount > 0 ? c.amber : c.green} />
-        <KPI label="Pending review" value={pending.length} accent={c.purple} />
+        <KPI label="Pending review" value={pendingCount} accent={c.purple} />
         <KPI label="Approved this session" value={approvedIds.length} accent={c.green} />
         <KPI label="Total leads" value={leads.length} />
       </div>
@@ -161,14 +164,17 @@ export default function CopilotPage() {
         </div>
       )}
 
-      {/* Pending drafts */}
-      {pending.length > 0 && (
+      {/* All drafts — approved ones stay in place with a success state */}
+      {visible.length > 0 && (
         <section style={{ marginBottom: 28 }}>
-          <div style={{ ...type.eyebrow, marginBottom: 12 }}>Pending your approval</div>
+          <div style={{ ...type.eyebrow, marginBottom: 12 }}>
+            {pendingCount > 0 ? 'Drafts to review' : 'All drafts approved'}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {pending.map(d => (
+            {visible.map(d => (
               <DraftCard
                 key={d.lead_id} draft={d}
+                approved={approvedIds.includes(d.lead_id)}
                 isEditing={editingId === d.lead_id}
                 editText={editText}
                 setEditText={setEditText}
@@ -178,29 +184,6 @@ export default function CopilotPage() {
                 onSaveEdit={() => handleSaveEdit(d)}
                 onCancelEdit={() => setEditingId(null)}
               />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {drafts.length > 0 && pending.length === 0 && !generating && (
-        <EmptyCard title="Inbox zero" body="You've reviewed every draft. Approved messages are logged on each lead." />
-      )}
-
-      {/* Approved log */}
-      {approvedIds.length > 0 && (
-        <section>
-          <div style={{ ...type.eyebrow, marginBottom: 12 }}>Approved this session</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {drafts.filter(d => approvedIds.includes(d.lead_id)).map(d => (
-              <div key={d.lead_id} style={{ ...card, padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={chipFor('success')}>✓</span>
-                  <span style={{ fontSize: 13, fontWeight: 500 }}>{d.lead_name}</span>
-                  <span style={chipFor('info')}>{d.channel}</span>
-                </div>
-                <span style={{ ...type.meta }}>Contact logged</span>
-              </div>
             ))}
           </div>
         </section>
@@ -224,24 +207,40 @@ const EmptyCard = ({ title, body, children }) => (
   </div>
 )
 
-const DraftCard = ({ draft, isEditing, editText, setEditText, onApprove, onSkip, onEdit, onSaveEdit, onCancelEdit }) => {
+const DraftCard = ({ draft, approved, isEditing, editText, setEditText, onApprove, onSkip, onEdit, onSaveEdit, onCancelEdit }) => {
   const urgencyChip = draft.urgency === 'high' ? chipFor('hot')
                     : draft.urgency === 'medium' ? chipFor('warm')
                     : chipFor('neutral')
+
   return (
-    <div style={card}>
+    <div style={{
+      ...card,
+      // Card stays in place after approval — green left edge + soft tint signal success.
+      ...(approved ? {
+        borderLeft: `3px solid ${c.green}`,
+        background: c.greenSoft,
+      } : {}),
+    }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 14, fontWeight: 600 }}>{draft.lead_name}</span>
-          <span style={urgencyChip}>{draft.urgency}</span>
-          <span style={chipFor('info')}>{draft.channel}</span>
+          {approved
+            ? <span style={chipFor('success')}>Approved · contact logged</span>
+            : <>
+                <span style={urgencyChip}>{draft.urgency}</span>
+                <span style={chipFor('info')}>{draft.channel}</span>
+              </>}
         </div>
         <div style={{ ...type.meta }}>
           {[draft.lead_type, draft.source, draft.stage].filter(Boolean).join(' · ')} · {draft.days_since_contact}d since contact
         </div>
       </div>
 
-      <div style={{ background: c.bgInset, border: `1px solid ${c.border}`, borderRadius: 6, padding: '12px 14px', marginBottom: 12 }}>
+      <div style={{
+        background: approved ? 'rgba(255,255,255,0.6)' : c.bgInset,
+        border: `1px solid ${c.border}`,
+        borderRadius: 6, padding: '12px 14px', marginBottom: 12,
+      }}>
         <div style={{ ...type.eyebrow, marginBottom: 6 }}>Draft message</div>
         {isEditing ? (
           <>
@@ -268,22 +267,33 @@ const DraftCard = ({ draft, isEditing, editText, setEditText, onApprove, onSkip,
         )}
       </div>
 
-      <div style={{
-        background: c.purpleSoft,
-        borderLeft: `2px solid ${c.purple}`,
-        padding: '10px 12px',
-        borderRadius: 4,
-        marginBottom: 14,
-      }}>
-        <div style={{ ...type.eyebrow, color: c.purple, marginBottom: 3 }}>Why now</div>
-        <div style={{ fontSize: 12.5, color: c.sub, lineHeight: 1.55 }}>{draft.reason}</div>
-      </div>
+      {!approved && (
+        <div style={{
+          background: c.purpleSoft,
+          borderLeft: `2px solid ${c.purple}`,
+          padding: '10px 12px',
+          borderRadius: 4,
+          marginBottom: 14,
+        }}>
+          <div style={{ ...type.eyebrow, color: c.purple, marginBottom: 3 }}>Why now</div>
+          <div style={{ fontSize: 12.5, color: c.sub, lineHeight: 1.55 }}>{draft.reason}</div>
+        </div>
+      )}
 
-      {!isEditing && (
+      {!isEditing && !approved && (
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={onApprove} style={{ ...btn.primary, background: c.green, border: `1px solid ${c.green}` }}>Approve & log</button>
           <button onClick={onEdit} style={btn.secondary}>Edit</button>
           <button onClick={onSkip} style={btn.ghost}>Skip</button>
+        </div>
+      )}
+
+      {approved && (
+        <div style={{ ...type.meta, color: c.green, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          This contact was logged. Copy the draft above and send it however you prefer (text, email, in-person).
         </div>
       )}
     </div>

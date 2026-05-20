@@ -23,6 +23,15 @@ export default function MessagesPage() {
   useEffect(() => { if (selectedLead) loadMessages(selectedLead.id) }, [selectedLead])
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
+  // Toggle a body class so the app shell hides its top bar / tab bar when
+  // a conversation is open on mobile. Cleaned up on unmount.
+  useEffect(() => {
+    if (typeof document === 'undefined') return
+    if (selectedLead) document.body.classList.add('brikk-msg-fullscreen')
+    else document.body.classList.remove('brikk-msg-fullscreen')
+    return () => document.body.classList.remove('brikk-msg-fullscreen')
+  }, [selectedLead])
+
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -125,7 +134,7 @@ export default function MessagesPage() {
   const showConversation = selectedLead !== null
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 140px)', minHeight: 500 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: showConversation ? '100vh' : 'calc(100vh - 140px)', minHeight: 500 }}>
       {toast && (
         <div style={{
           position: 'fixed', top: 80, right: 24, zIndex: 200,
@@ -136,17 +145,21 @@ export default function MessagesPage() {
         }}>{toast}</div>
       )}
 
-      <div style={{ marginBottom: 16 }}>
+      <div className="brikk-msg-page-title" style={{ marginBottom: 16 }}>
         <h1 style={{ ...type.pageTitle, margin: 0 }}>Messages</h1>
         <p style={{ ...type.bodySub, margin: '4px 0 0' }}>Text leads directly. AI can draft a message for you.</p>
       </div>
 
       <style>{`
         .brikk-back-btn { display: none; }
+        .brikk-msg-mobile-header { display: none; }
         @media (max-width: 700px) {
           .brikk-msg-list { display: ${showConversation ? 'none' : 'flex'} !important; }
           .brikk-msg-conv { display: ${showConversation ? 'flex' : 'none'} !important; }
           .brikk-back-btn { display: inline-flex !important; }
+          .brikk-msg-page-title { display: ${showConversation ? 'none' : 'block'} !important; }
+          .brikk-msg-mobile-header { display: ${showConversation ? 'flex' : 'none'} !important; }
+          .brikk-msg-desktop-header { display: ${showConversation ? 'none' : 'flex'} !important; }
         }
       `}</style>
 
@@ -220,8 +233,44 @@ export default function MessagesPage() {
             </div>
           ) : (
             <>
-              {/* Header */}
-              <div style={{
+              {/* Mobile slim header — just a back arrow + name */}
+              <div className="brikk-msg-mobile-header" style={{
+                display: 'none',
+                position: 'sticky', top: 0, zIndex: 20,
+                background: 'rgba(255,255,255,0.96)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                borderBottom: `1px solid ${c.border}`,
+                padding: '12px 12px calc(12px + env(safe-area-inset-top, 0px)) 12px',
+                paddingTop: 'calc(12px + env(safe-area-inset-top, 0px))',
+                alignItems: 'center', gap: 8,
+              }}>
+                <button
+                  onClick={() => setSelectedLead(null)}
+                  aria-label="Back"
+                  style={{
+                    width: 36, height: 36, borderRadius: 6,
+                    background: 'transparent', border: 'none',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                    color: c.text, fontSize: 20, lineHeight: 1,
+                    flexShrink: 0,
+                  }}
+                >‹</button>
+                <Avatar name={selectedLead.name} temperature={selectedLead.temperature} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {selectedLead.name}
+                  </div>
+                  <div style={{ ...type.meta, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {selectedLead.phone || 'No phone'}
+                  </div>
+                </div>
+                <span style={temperatureChip(selectedLead.temperature)}>{(selectedLead.temperature || '').toUpperCase()}</span>
+              </div>
+
+              {/* Desktop header */}
+              <div className="brikk-msg-desktop-header" style={{
                 ...card,
                 borderRadius: '8px 8px 0 0',
                 padding: '12px 16px',
@@ -229,9 +278,6 @@ export default function MessagesPage() {
                 flexWrap: 'wrap', gap: 8,
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <button onClick={() => setSelectedLead(null)} className="brikk-back-btn" aria-label="Back" style={{ ...btn.ghost, padding: '0 8px', fontSize: 20, lineHeight: 1 }}>
-                    ‹
-                  </button>
                   <Avatar name={selectedLead.name} temperature={selectedLead.temperature} />
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 600 }}>{selectedLead.name}</div>

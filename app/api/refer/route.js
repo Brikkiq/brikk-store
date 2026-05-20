@@ -11,26 +11,29 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Server not configured' }, { status: 503 })
     }
 
-    const { name, phone, email, type, price, notes, agent_id } = await request.json()
+    const { name, phone, email, type, price, notes, agent_id, referral_code } = await request.json()
 
     if (!name || !phone) {
       return NextResponse.json({ error: 'Name and phone required' }, { status: 400 })
     }
-    if (!agent_id) {
-      // Refuse to silently route to a random agent.
+    if (!agent_id && !referral_code) {
       return NextResponse.json({ error: 'Invalid referral link' }, { status: 400 })
     }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey)
 
-    // Confirm the agent_id actually exists in profiles before writing.
-    const { data: agent, error: agentErr } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .eq('id', agent_id)
-      .single()
-
-    if (agentErr || !agent) {
+    // Resolve agent — by id, or by short referral_code.
+    let agentLookup
+    if (agent_id) {
+      agentLookup = await supabaseAdmin.from('profiles').select('id').eq('id', agent_id).single()
+    } else {
+      agentLookup = await supabaseAdmin
+        .from('profiles').select('id')
+        .eq('referral_code', String(referral_code).toUpperCase())
+        .single()
+    }
+    const agent = agentLookup.data
+    if (agentLookup.error || !agent) {
       return NextResponse.json({ error: 'Invalid referral link' }, { status: 400 })
     }
 

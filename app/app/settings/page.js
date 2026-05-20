@@ -6,6 +6,7 @@ import { c, type, card, btn, input, inputLabel } from '@/lib/design'
 
 const TABS = [
   { id: 'profile',    label: 'Profile' },
+  { id: 'team',       label: 'Team' },
   { id: 'appearance', label: 'Appearance' },
   { id: 'billing',    label: 'Billing' },
   { id: 'referral',   label: 'Lead capture link' },
@@ -158,7 +159,10 @@ export default function SettingsPage() {
   if (loading) return <div style={{ padding: 60, textAlign: 'center', color: c.dim, fontSize: 13 }}>Loading…</div>
 
   const initials = (editName || user?.email || '?').split(' ').filter(Boolean).map(s => s[0]).join('').slice(0, 2).toUpperCase()
-  const referralLink = `https://brikk.store/refer?agent=${user?.id || ''}`
+  const referralCode = profile?.referral_code || null
+  const referralLink = referralCode
+    ? `https://brikk.store/r/${referralCode}`
+    : `https://brikk.store/refer?agent=${user?.id || ''}`
 
   return (
     <div>
@@ -255,8 +259,10 @@ export default function SettingsPage() {
             />
           )}
 
+          {activeTab === 'team' && <TeamTab user={user} showToast={showToast} />}
+
           {activeTab === 'billing' && <BillingTab user={user} saving={saving} setSaving={setSaving} showToast={showToast} />}
-          {activeTab === 'referral' && <ReferralTab referralLink={referralLink} showToast={showToast} />}
+          {activeTab === 'referral' && <ReferralTab referralLink={referralLink} referralCode={referralCode} showToast={showToast} />}
           {activeTab === 'privacy' && <PrivacyTab />}
           {activeTab === 'agreement' && <AgreementTab />}
 
@@ -477,8 +483,8 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
         </div>
       </Section>
 
-      <Section title="Plans" description="Cancel anytime in Settings.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+      <Section title="Plans" description="Cancel anytime. Switching between plans is supported — contact us if you need help.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
           <PlanCard
             title="Pro" subtitle="Solo agents"
             price="$75" period="/mo" setup="+$125 setup"
@@ -490,8 +496,15 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
           <PlanCard
             title="Team" subtitle="Up to 5 agents"
             price="$200" period="/mo" setup="+$125 setup"
-            features="Everything in Pro plus team dashboard, lead routing, and priority support."
+            features="Everything in Pro plus team management with shared seats, team code for member onboarding, and priority support."
             onClick={() => checkout('team')}
+            saving={saving}
+          />
+          <PlanCard
+            title="Agency" subtitle="Unlimited agents"
+            price="Custom" period="" setup="Custom onboarding"
+            features="Everything in Team, scaled for brokerages. Team-code seat management, dedicated success contact, custom SLAs, and onboarding support for your full agent roster."
+            contactSales
             saving={saving}
           />
         </div>
@@ -501,7 +514,7 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
   )
 }
 
-const PlanCard = ({ title, subtitle, price, period, setup, features, primary, onClick, saving }) => (
+const PlanCard = ({ title, subtitle, price, period, setup, features, primary, contactSales, onClick, saving }) => (
   <div style={{
     background: c.white,
     border: `1px solid ${primary ? c.text : c.border}`,
@@ -516,38 +529,74 @@ const PlanCard = ({ title, subtitle, price, period, setup, features, primary, on
       </div>
       <div style={{ textAlign: 'right' }}>
         <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.02em' }}>
-          {price}<span style={{ fontSize: 13, color: c.dim, fontWeight: 400 }}>{period}</span>
+          {price}{period && <span style={{ fontSize: 13, color: c.dim, fontWeight: 400 }}>{period}</span>}
         </div>
-        <div style={{ ...type.meta }}>{setup}</div>
+        {setup && <div style={{ ...type.meta }}>{setup}</div>}
       </div>
     </div>
     <div style={{ ...type.bodySub, fontSize: 12.5 }}>{features}</div>
-    <button
-      onClick={onClick}
-      disabled={saving}
-      style={{ ...(primary ? btn.primary : btn.secondary), opacity: saving ? 0.5 : 1 }}
-    >
-      {saving ? 'Loading…' : `Subscribe — ${price}${period}`}
-    </button>
+    {contactSales ? (
+      <a
+        href="mailto:hello@brikk.store?subject=Brikk%20Agency%20plan%20enquiry"
+        style={{ ...btn.secondary, textDecoration: 'none', width: '100%', justifyContent: 'center' }}
+      >Contact sales</a>
+    ) : (
+      <button
+        onClick={onClick}
+        disabled={saving}
+        style={{ ...(primary ? btn.primary : btn.secondary), opacity: saving ? 0.5 : 1 }}
+      >
+        {saving ? 'Loading…' : `Subscribe — ${price}${period}`}
+      </button>
+    )}
   </div>
 )
 
-const ReferralTab = ({ referralLink, showToast }) => (
-  <Section title="Lead capture link" description="Share this on business cards, social media, or email signatures. Submissions arrive in your pipeline tagged 'Referral Link'.">
-    <div style={{
-      background: c.bgInset, border: `1px solid ${c.border}`,
-      borderRadius: 6, padding: '12px 14px',
-      fontSize: 13, color: c.text, wordBreak: 'break-all', marginBottom: 12,
-      fontFamily: 'ui-monospace, SFMono-Regular, monospace',
-    }}>{referralLink}</div>
-    <div style={{ display: 'flex', gap: 8 }}>
-      <button
-        onClick={() => { navigator.clipboard?.writeText(referralLink); showToast('Link copied') }}
-        style={btn.primary}
-      >Copy link</button>
-      <a href={referralLink} target="_blank" rel="noreferrer" style={{ ...btn.secondary, textDecoration: 'none' }}>Preview</a>
-    </div>
-  </Section>
+const ReferralTab = ({ referralLink, referralCode, showToast }) => (
+  <>
+    <Section title="Your lead capture link" description="Share this on business cards, Instagram bio, email signature, or anywhere prospects might see you. Submissions land in your Leads pipeline tagged 'Referral Link' and you get a live alert.">
+      <div style={{
+        background: c.bgInset, border: `1px solid ${c.border}`,
+        borderRadius: 6, padding: '12px 14px',
+        fontSize: 14, color: c.text, wordBreak: 'break-all', marginBottom: 12,
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+      }}>{referralLink}</div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => { navigator.clipboard?.writeText(referralLink); showToast('Link copied') }}
+          style={btn.primary}
+        >Copy link</button>
+        <a href={referralLink} target="_blank" rel="noreferrer" style={{ ...btn.secondary, textDecoration: 'none' }}>
+          Preview as a lead would see it
+        </a>
+      </div>
+    </Section>
+
+    {referralCode && (
+      <Section title="Your code" description={`Use this if you only have room for a short tag — e.g. in a print ad: "Brikk code ${referralCode}".`}>
+        <div style={{
+          fontSize: 24, fontWeight: 600, letterSpacing: '0.04em',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+          background: c.bgInset, border: `1px solid ${c.border}`,
+          borderRadius: 6, padding: '14px 18px',
+          display: 'inline-block', marginBottom: 8,
+        }}>{referralCode}</div>
+        <div style={{ ...type.meta }}>
+          A lead can also enter this code at <span style={{ color: c.text, fontFamily: 'ui-monospace, monospace' }}>brikk.store/refer</span> to be routed to you.
+        </div>
+      </Section>
+    )}
+
+    <Section title="Where to use it" description="A few high-leverage places agents have seen results:">
+      <ul style={{ ...type.bodySub, paddingLeft: 18, margin: 0, lineHeight: 1.8 }}>
+        <li>Instagram bio or "Link in bio" tools (Linktree, Beacons)</li>
+        <li>Email signature, below your name</li>
+        <li>QR code on your business card</li>
+        <li>Door hangers, open-house sign-in pages, yard signs</li>
+        <li>The end of a "Just sold" or "Coming soon" social post</li>
+      </ul>
+    </Section>
+  </>
 )
 
 const PrivacyTab = () => (
@@ -577,6 +626,210 @@ const PrivacyTab = () => (
     </Section>
   </>
 )
+
+const TeamTab = ({ user, showToast }) => {
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [team, setTeam] = useState(null)
+  const [members, setMembers] = useState([])
+  const [role, setRole] = useState(null)
+  const [createName, setCreateName] = useState('')
+  const [joinCode, setJoinCode] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    const session = (await supabase.auth.getSession()).data.session
+    if (!session) { setLoading(false); return }
+    const res = await fetch('/api/team', {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    const data = await res.json()
+    setTeam(data.team || null)
+    setMembers(data.members || [])
+    setRole(data.role || null)
+    setLoading(false)
+  }
+
+  useEffect(() => { load() }, [])
+
+  const call = async (body) => {
+    setBusy(true)
+    try {
+      const session = (await supabase.auth.getSession()).data.session
+      const res = await fetch('/api/team', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token || ''}`,
+        },
+        body: JSON.stringify(body),
+      })
+      const data = await res.json()
+      if (data.error) { showToast(data.error, 'error'); return null }
+      return data
+    } catch (err) {
+      showToast('Network error', 'error')
+      return null
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleCreate = async () => {
+    if (!createName.trim()) { showToast('Team name required', 'error'); return }
+    const data = await call({ action: 'create', name: createName.trim() })
+    if (data) { showToast('Team created'); setCreateName(''); load() }
+  }
+
+  const handleJoin = async () => {
+    if (!joinCode.trim()) { showToast('Team code required', 'error'); return }
+    const data = await call({ action: 'join', team_code: joinCode.trim() })
+    if (data) { showToast(`Joined ${data.team?.name || 'team'}`); setJoinCode(''); load() }
+  }
+
+  const handleLeave = async () => {
+    if (!confirm('Leave this team? You will lose access to shared features.')) return
+    const data = await call({ action: 'leave' })
+    if (data) { showToast('Left team'); load() }
+  }
+
+  const handleRemove = async (userId, name) => {
+    if (!confirm(`Remove ${name || 'this member'} from the team?`)) return
+    const data = await call({ action: 'remove_member', user_id: userId })
+    if (data) { showToast('Member removed'); load() }
+  }
+
+  const handleRegenerate = async () => {
+    if (!confirm('Regenerate the team code? Old code will stop working. Existing members are unaffected.')) return
+    const data = await call({ action: 'regenerate_code' })
+    if (data?.team_code) { showToast('New code generated'); load() }
+  }
+
+  const handleDelete = async () => {
+    if (!confirm('Delete the team? All members will be detached. This cannot be undone.')) return
+    const data = await call({ action: 'delete' })
+    if (data) { showToast('Team deleted'); load() }
+  }
+
+  if (loading) return <Section title="Team"><div style={{ ...type.bodySub }}>Loading…</div></Section>
+
+  // ---- Solo agent — show create / join options ----
+  if (!team) {
+    return (
+      <>
+        <Section
+          title="Create a team"
+          description="If you're paying for a Team or Agency plan, set up your team here. You'll get a code to share with your agents so they can join without paying separately."
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
+            <Field label="Team name">
+              <input value={createName} onChange={e => setCreateName(e.target.value)} placeholder="Acme Realty Group" style={input} />
+            </Field>
+          </div>
+          <button onClick={handleCreate} disabled={busy || !createName.trim()} style={{ ...btn.primary, opacity: busy || !createName.trim() ? 0.5 : 1 }}>
+            {busy ? 'Creating…' : 'Create team'}
+          </button>
+        </Section>
+
+        <Section
+          title="Join a team"
+          description="Already have a team code from your team lead or brokerage? Enter it here to skip individual billing."
+        >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
+            <Field label="Team code">
+              <input
+                value={joinCode}
+                onChange={e => setJoinCode(e.target.value.toUpperCase())}
+                placeholder="TEAM-XXXX-YYYY"
+                style={{ ...input, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.04em' }}
+              />
+            </Field>
+          </div>
+          <button onClick={handleJoin} disabled={busy || !joinCode.trim()} style={{ ...btn.secondary, opacity: busy || !joinCode.trim() ? 0.5 : 1 }}>
+            {busy ? 'Joining…' : 'Join team'}
+          </button>
+        </Section>
+      </>
+    )
+  }
+
+  // ---- Owner view ----
+  if (role === 'owner') {
+    return (
+      <>
+        <Section title={team.name} description={`${team.plan_tier === 'agency' ? 'Agency' : 'Team'} plan · ${members.length} of ${team.max_seats} seats used`}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ ...inputLabel, marginBottom: 6 }}>Team code</div>
+            <div style={{
+              fontSize: 18, fontWeight: 600, letterSpacing: '0.04em',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+              background: c.bgInset, border: `1px solid ${c.border}`,
+              borderRadius: 6, padding: '12px 16px',
+              display: 'inline-block', marginBottom: 8,
+            }}>{team.team_code}</div>
+            <div style={{ ...type.meta }}>Share this code with your agents. They enter it during signup or in Settings → Team.</div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+              <button onClick={() => { navigator.clipboard?.writeText(team.team_code); showToast('Code copied') }} style={btn.primary}>Copy code</button>
+              <button onClick={handleRegenerate} style={btn.secondary} disabled={busy}>Regenerate code</button>
+            </div>
+          </div>
+        </Section>
+
+        <Section title="Members" description="Agents currently on your team.">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {members.length === 0 && <div style={{ ...type.bodySub }}>No members yet. Share the team code above.</div>}
+            {members.map(m => (
+              <div key={m.id} style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                padding: '10px 12px', borderRadius: 6,
+                border: `1px solid ${c.border}`, background: c.white,
+                gap: 12, flexWrap: 'wrap',
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{m.full_name || 'Unnamed'}</div>
+                  <div style={{ ...type.meta }}>
+                    {m.team_role === 'owner' ? 'Owner' : 'Member'}
+                    {m.brokerage ? ` · ${m.brokerage}` : ''}
+                  </div>
+                </div>
+                {m.id !== user.id && (
+                  <button onClick={() => handleRemove(m.id, m.full_name)} style={{ ...btn.ghost, color: c.red }} disabled={busy}>
+                    Remove
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+
+        <Section title="Danger zone">
+          <button onClick={handleDelete} style={btn.danger} disabled={busy}>
+            Delete team
+          </button>
+          <div style={{ ...type.meta, marginTop: 8 }}>
+            Members will be detached and revert to solo plans. Your billing isn't cancelled automatically — manage that in Stripe.
+          </div>
+        </Section>
+      </>
+    )
+  }
+
+  // ---- Member view ----
+  return (
+    <Section title={team.name} description={`You're a member of this ${team.plan_tier === 'agency' ? 'agency' : 'team'}. Billing is covered by your team owner.`}>
+      <div style={{
+        background: c.greenSoft, border: `1px solid ${c.greenBorder}`,
+        borderRadius: 6, padding: '14px 16px', marginBottom: 12,
+      }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: c.green }}>Plan covered by team</div>
+        <div style={{ ...type.bodySub, marginTop: 4 }}>
+          You don't have a personal subscription — your access comes from the {team.plan_tier === 'agency' ? 'agency' : 'team'} plan.
+        </div>
+      </div>
+      <button onClick={handleLeave} style={btn.danger} disabled={busy}>Leave team</button>
+    </Section>
+  )
+}
 
 const AgreementTab = () => (
   <>

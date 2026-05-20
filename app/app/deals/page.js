@@ -205,55 +205,119 @@ const DealCard = ({ deal, onEdit, onDelete, onStage }) => {
 const Stepper = ({ current, onSelect }) => {
   const currentIdx = stageOptions.indexOf(current)
   return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 0 }}>
-      {/* Background track */}
-      <div style={{
-        position: 'absolute', left: 12, right: 12, top: '50%',
-        height: 1, background: c.border, zIndex: 0,
-      }} />
-      {/* Filled track */}
-      {currentIdx > 0 && (
+    <>
+      <style>{`
+        .brikk-stepper-h { display: flex; }
+        .brikk-stepper-v { display: none; }
+        @media (max-width: 700px) {
+          .brikk-stepper-h { display: none !important; }
+          .brikk-stepper-v { display: flex !important; }
+        }
+      `}</style>
+
+      {/* Horizontal — desktop / tablet */}
+      <div className="brikk-stepper-h" style={{ position: 'relative', alignItems: 'center', justifyContent: 'space-between', gap: 0 }}>
         <div style={{
-          position: 'absolute', left: 12, top: '50%',
-          height: 1, background: c.green,
-          width: `calc(${(currentIdx / (stageOptions.length - 1)) * 100}% - 24px)`,
-          zIndex: 1,
+          position: 'absolute', left: 12, right: 12, top: 9,
+          height: 1, background: c.border, zIndex: 0,
         }} />
-      )}
-      {stageOptions.map((s, i) => {
-        const done = i <= currentIdx
-        const isCurrent = i === currentIdx
-        return (
-          <button
-            key={s}
-            onClick={() => onSelect(s)}
-            style={{
-              position: 'relative', zIndex: 2,
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-              background: 'transparent', border: 'none', cursor: 'pointer',
-              padding: 0, fontFamily: 'inherit', flex: 1,
-            }}
-          >
-            <span style={{
-              width: 18, height: 18, borderRadius: '50%',
-              background: done ? c.green : c.white,
-              border: `1px solid ${done ? c.green : c.border}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontSize: 10, fontWeight: 700,
-              boxShadow: isCurrent ? `0 0 0 4px ${c.greenSoft}` : 'none',
-            }}>
-              {done && '✓'}
-            </span>
-            <span style={{
-              fontSize: 11,
-              fontWeight: isCurrent ? 600 : 500,
-              color: done ? c.text : c.dim,
-              whiteSpace: 'nowrap',
-            }}>{s}</span>
-          </button>
-        )
-      })}
-    </div>
+        {currentIdx > 0 && (
+          <div style={{
+            position: 'absolute', left: 12, top: 9,
+            height: 1, background: c.green,
+            width: `calc(${(currentIdx / (stageOptions.length - 1)) * 100}% - 24px)`,
+            zIndex: 1,
+          }} />
+        )}
+        {stageOptions.map((s, i) => {
+          const done = i <= currentIdx
+          const isCurrent = i === currentIdx
+          return (
+            <button
+              key={s}
+              onClick={() => onSelect(s)}
+              style={{
+                position: 'relative', zIndex: 2,
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: 0, fontFamily: 'inherit', flex: 1, minWidth: 0,
+              }}
+            >
+              <span style={{
+                width: 18, height: 18, borderRadius: '50%',
+                background: done ? c.green : c.white,
+                border: `1px solid ${done ? c.green : c.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: 10, fontWeight: 700,
+                boxShadow: isCurrent ? `0 0 0 4px ${c.greenSoft}` : 'none',
+                flexShrink: 0,
+              }}>
+                {done && '✓'}
+              </span>
+              <span style={{
+                fontSize: 11,
+                fontWeight: isCurrent ? 600 : 500,
+                color: done ? c.text : c.dim,
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
+                padding: '0 2px',
+              }}>{s}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Vertical — mobile */}
+      <div className="brikk-stepper-v" style={{ flexDirection: 'column', gap: 0, position: 'relative' }}>
+        <div style={{
+          position: 'absolute', left: 8, top: 12, bottom: 12,
+          width: 1, background: c.border, zIndex: 0,
+        }} />
+        {currentIdx > 0 && (
+          <div style={{
+            position: 'absolute', left: 8, top: 12,
+            width: 1, background: c.green,
+            height: `calc(${(currentIdx / (stageOptions.length - 1)) * 100}% - 24px)`,
+            zIndex: 1,
+          }} />
+        )}
+        {stageOptions.map((s, i) => {
+          const done = i <= currentIdx
+          const isCurrent = i === currentIdx
+          return (
+            <button
+              key={s}
+              onClick={() => onSelect(s)}
+              style={{
+                position: 'relative', zIndex: 2,
+                display: 'flex', alignItems: 'center', gap: 12,
+                background: 'transparent', border: 'none', cursor: 'pointer',
+                padding: '6px 0', fontFamily: 'inherit', textAlign: 'left',
+              }}
+            >
+              <span style={{
+                width: 18, height: 18, borderRadius: '50%',
+                background: done ? c.green : c.white,
+                border: `1px solid ${done ? c.green : c.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#fff', fontSize: 10, fontWeight: 700,
+                boxShadow: isCurrent ? `0 0 0 4px ${c.greenSoft}` : 'none',
+                flexShrink: 0,
+              }}>
+                {done && '✓'}
+              </span>
+              <span style={{
+                fontSize: 13,
+                fontWeight: isCurrent ? 600 : 500,
+                color: done ? c.text : c.dim,
+              }}>{s}</span>
+            </button>
+          )
+        })}
+      </div>
+    </>
   )
 }
 

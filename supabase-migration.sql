@@ -3,6 +3,35 @@
 -- Every statement is idempotent (IF NOT EXISTS / IF EXISTS) so re-running it is harmless.
 
 -- =====================================================================
+-- TEAMS (multi-agent plans share one subscription)
+-- =====================================================================
+CREATE TABLE IF NOT EXISTS public.teams (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  team_code text UNIQUE NOT NULL,
+  plan_tier text NOT NULL DEFAULT 'team',           -- 'team' | 'agency'
+  owner_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  max_seats integer NOT NULL DEFAULT 5,
+  stripe_subscription_id text,
+  status text NOT NULL DEFAULT 'active',            -- 'active' | 'cancelled' | 'past_due'
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS name text;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS team_code text;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS plan_tier text DEFAULT 'team';
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS owner_id uuid;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS max_seats integer DEFAULT 5;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS status text DEFAULT 'active';
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+ALTER TABLE public.teams ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_teams_code ON public.teams(team_code);
+CREATE INDEX IF NOT EXISTS idx_teams_owner ON public.teams(owner_id);
+
+-- =====================================================================
 -- PROFILES
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -10,6 +39,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   full_name text,
   phone text,
   brokerage text,
+  referral_code text UNIQUE,
+  team_id uuid REFERENCES public.teams(id) ON DELETE SET NULL,
+  team_role text,                          -- 'owner' | 'member' | NULL for solo
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -18,8 +50,15 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS full_name text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS brokerage text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS team_id uuid;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS team_role text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
+
+-- Unique index on referral_code (after column ensured)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_profiles_referral_code ON public.profiles(referral_code) WHERE referral_code IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_profiles_team_id ON public.profiles(team_id) WHERE team_id IS NOT NULL;
 
 -- Auto-create a profile row whenever a new auth user is created.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -173,6 +212,7 @@ ALTER TABLE public.leads         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.deals         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.messages      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.interactions  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teams         ENABLE ROW LEVEL SECURITY;
 
 -- Drop and recreate so we know exactly what policies are live
 DROP POLICY IF EXISTS "profiles_self_select" ON public.profiles;
@@ -197,6 +237,19 @@ CREATE POLICY "messages_own_all" ON public.messages
 DROP POLICY IF EXISTS "interactions_own_all" ON public.interactions;
 CREATE POLICY "interactions_own_all" ON public.interactions
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Teams: any team member can SELECT the team they belong to. Only the owner can UPDATE.
+-- Inserts go through the service role (api/team), so no INSERT policy needed.
+DROP POLICY IF EXISTS "teams_member_select" ON public.teams;
+CREATE POLICY "teams_member_select" ON public.teams FOR SELECT
+  USING (
+    id IN (SELECT team_id FROM public.profiles WHERE id = auth.uid())
+    OR owner_id = auth.uid()
+  );
+
+DROP POLICY IF EXISTS "teams_owner_update" ON public.teams;
+CREATE POLICY "teams_owner_update" ON public.teams FOR UPDATE
+  USING (owner_id = auth.uid()) WITH CHECK (owner_id = auth.uid());
 
 -- =====================================================================
 -- updated_at auto-touch trigger

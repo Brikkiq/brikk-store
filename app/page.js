@@ -344,7 +344,7 @@ export default function Home(){
             {/* Team */}
             <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:12,padding:"32px 28px"}}>
               <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Team</div>
-              <div style={{fontSize:13,color:c.sub,marginBottom:16}}>For teams & brokerages</div>
+              <div style={{fontSize:13,color:c.sub,marginBottom:16}}>For small teams</div>
               <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:2}}>
                 <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$200</span>
                 <span style={{fontSize:14,color:c.sub}}>/month</span>
@@ -352,11 +352,28 @@ export default function Home(){
               <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 45 days</div>
               <div style={{fontSize:12,color:c.dim,marginBottom:20}}>+ $125 one-time setup fee</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
-                {["Everything in Pro","Up to 5 agent seats","Broker dashboard","Team performance metrics","Lead routing","Priority support"].map((f,i)=>(
+                {["Everything in Pro","Up to 5 agent seats","Team code for member onboarding","Shared subscription","Priority support"].map((f,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:4,height:4,borderRadius:"50%",background:c.dim}}/><span style={{fontSize:13,color:c.sub}}>{f}</span></div>
                 ))}
               </div>
-              <a href="/login" style={{display:"block",background:c.bg,border:`1px solid ${c.border}`,borderRadius:8,padding:"13px 0",fontSize:14,fontWeight:600,color:c.sub,textDecoration:"none",textAlign:"center"}}>Contact Us</a>
+              <a href="/login" style={{display:"block",background:c.bg,border:`1px solid ${c.border}`,borderRadius:8,padding:"13px 0",fontSize:14,fontWeight:600,color:c.sub,textDecoration:"none",textAlign:"center"}}>Start 45-day trial</a>
+            </div>
+
+            {/* Agency */}
+            <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:12,padding:"32px 28px"}}>
+              <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Agency</div>
+              <div style={{fontSize:13,color:c.sub,marginBottom:16}}>For brokerages & networks</div>
+              <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:2}}>
+                <span style={{fontSize:36,fontWeight:700,letterSpacing:"-0.02em"}}>Custom</span>
+              </div>
+              <div style={{fontSize:13,color:c.dim,fontWeight:500,marginBottom:4}}>Scaled for your roster</div>
+              <div style={{fontSize:12,color:c.dim,marginBottom:20}}>Custom onboarding included</div>
+              <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
+                {["Everything in Team","Unlimited agent seats","Team code seat management","Dedicated success contact","Custom SLAs","Onboarding for full agent roster"].map((f,i)=>(
+                  <div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:4,height:4,borderRadius:"50%",background:c.dim}}/><span style={{fontSize:13,color:c.sub}}>{f}</span></div>
+                ))}
+              </div>
+              <a href="mailto:hello@brikk.store?subject=Brikk%20Agency%20plan%20enquiry" style={{display:"block",background:c.bg,border:`1px solid ${c.border}`,borderRadius:8,padding:"13px 0",fontSize:14,fontWeight:600,color:c.sub,textDecoration:"none",textAlign:"center"}}>Contact sales</a>
             </div>
           </div>
           <p style={{fontSize:12,color:c.dim,marginTop:16,textAlign:"center"}}>No credit card required to start</p>
