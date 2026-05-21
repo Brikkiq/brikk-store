@@ -260,16 +260,28 @@ export default function Home(){
     el.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
-  // Handle direct URL load with #hash. Wait for layout to settle.
+  // Handle direct URL load with #hash. We wait for layout to settle on slow
+  // browsers by combining requestAnimationFrame + a fallback setTimeout. This
+  // prevents the "page appears blank on direct hash URL" issue that can happen
+  // when the scroll fires before the page has rendered.
   useEffect(()=>{
     if(typeof window==='undefined') return
     const scrollToHash=()=>{
       const hash=window.location.hash
-      if(hash) scrollToSection(hash)
+      if(!hash) return
+      // Two-frame delay ensures layout is fully painted on slow devices
+      requestAnimationFrame(()=>requestAnimationFrame(()=>scrollToSection(hash)))
     }
-    const t = setTimeout(scrollToHash, 80)
+    // Fire on mount AND as a fallback after a delay in case the layout is
+    // particularly slow (font loading, etc.).
+    scrollToHash()
+    const t1 = setTimeout(scrollToHash, 150)
+    const t2 = setTimeout(scrollToHash, 600)
     window.addEventListener('hashchange', scrollToHash)
-    return ()=>{ clearTimeout(t); window.removeEventListener('hashchange', scrollToHash) }
+    return ()=>{
+      clearTimeout(t1); clearTimeout(t2)
+      window.removeEventListener('hashchange', scrollToHash)
+    }
   },[])
 
   // Used as onClick for nav anchor links to override the browser's default
