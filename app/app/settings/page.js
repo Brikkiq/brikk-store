@@ -183,16 +183,94 @@ export default function SettingsPage() {
         <p style={{ ...type.bodySub, margin: '4px 0 0' }}>{user?.email}</p>
       </div>
 
+      {/* Mobile-only profile chip — desktop has this in the sidebar; on phones
+          there's no sidebar so we surface it here at the top of Settings. */}
+      <div
+        className="brikk-settings-mobile-list"
+        style={{
+          ...card,
+          padding: '14px 16px',
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+        }}
+      >
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          style={{
+            width: 42, height: 42, borderRadius: 8,
+            background: profilePic ? 'transparent' : c.bgInset,
+            border: `1px solid ${c.border}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', overflow: 'hidden', flexShrink: 0,
+          }}
+        >
+          {profilePic
+            ? <img src={profilePic} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <span style={{ fontSize: 14, fontWeight: 600, color: c.text }}>{initials}</span>}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {editName || 'No name yet'}
+          </div>
+          <div style={{ ...type.meta, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {user?.email}
+          </div>
+        </div>
+      </div>
+
       <style>{`
         .brikk-settings-layout { display: block; }
         .brikk-settings-nav { display: none; }
         .brikk-settings-mobile-list { display: block; }
+        .brikk-settings-mobile-tabs { display: flex; }
         @media (min-width: 901px) {
           .brikk-settings-layout { display: grid !important; grid-template-columns: 200px 1fr !important; gap: 24px !important; }
           .brikk-settings-nav { display: flex !important; flex-direction: column !important; }
           .brikk-settings-mobile-list { display: none !important; }
+          .brikk-settings-mobile-tabs { display: none !important; }
         }
+        /* Hide scrollbar on the horizontal tab strip — looks cleaner */
+        .brikk-settings-mobile-tabs::-webkit-scrollbar { display: none; }
+        .brikk-settings-mobile-tabs { -ms-overflow-style: none; scrollbar-width: none; }
       `}</style>
+
+      {/* Mobile-only horizontal tab strip — replaces the hidden desktop sidebar.
+          Scrolls horizontally if the row overflows; the active tab snaps into view. */}
+      <nav
+        className="brikk-settings-mobile-tabs"
+        style={{
+          display: 'flex',
+          gap: 6,
+          overflowX: 'auto',
+          marginBottom: 16,
+          paddingBottom: 4,
+          scrollSnapType: 'x proximity',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setActiveTab(t.id)}
+            style={{
+              flexShrink: 0,
+              scrollSnapAlign: 'start',
+              background: activeTab === t.id ? c.text : c.white,
+              color: activeTab === t.id ? c.white : c.sub,
+              border: `1px solid ${activeTab === t.id ? c.text : c.border}`,
+              borderRadius: 999,
+              padding: '8px 14px',
+              fontSize: 12.5,
+              fontWeight: activeTab === t.id ? 600 : 500,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+            }}
+          >{t.label}</button>
+        ))}
+      </nav>
 
       <div className="brikk-settings-layout">
         {/* Sidebar nav (desktop) */}

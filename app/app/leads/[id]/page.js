@@ -164,10 +164,10 @@ export default function LeadDetailPage() {
       {/* Hero card */}
       <div style={{ ...card, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
             <Avatar name={lead.name} temperature={lead.temperature} />
-            <div>
-              <h1 style={{ ...type.pageTitle, margin: 0, fontSize: 22 }}>{lead.name}</h1>
+            <div style={{ minWidth: 0 }}>
+              <h1 style={{ ...type.pageTitle, margin: 0, fontSize: 22, wordBreak: 'break-word' }}>{lead.name}</h1>
               <div style={{ ...type.bodySub, marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                 <span style={temperatureChip(lead.temperature)}>{(lead.temperature || '').toUpperCase()}</span>
                 <span>· {lead.lead_type || 'Buyer'}</span>
@@ -177,8 +177,9 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Quick actions */}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {/* Quick actions — wrap-friendly. The 'Open conversation' label is the
+              longest, so on phones it tends to drop to its own line, which is fine. */}
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: '0 1 auto' }}>
             {phone && (
               <a href={`tel:${phone}`} style={{ ...btn.secondary, textDecoration: 'none' }}>Call</a>
             )}
@@ -188,7 +189,7 @@ export default function LeadDetailPage() {
             {lead.email && (
               <a href={`mailto:${lead.email}`} style={{ ...btn.secondary, textDecoration: 'none' }}>Email</a>
             )}
-            <a href={`/app/messages?lead=${lead.id}`} style={{ ...btn.secondary, textDecoration: 'none' }}>Open conversation</a>
+            <a href={`/app/messages?lead=${lead.id}`} style={{ ...btn.secondary, textDecoration: 'none' }}>Conversation</a>
           </div>
         </div>
 
@@ -282,13 +283,13 @@ export default function LeadDetailPage() {
         <button onClick={handleDelete} style={btn.danger}>Delete lead</button>
       </div>
 
-      {/* Inline edit modal */}
+      {/* Inline edit modal — bottom-sheet style on phones so it doesn't fight the keyboard */}
       {editingField && (
         <div onClick={(e) => { if (e.target === e.currentTarget) cancelEdit() }} style={{
           position: 'fixed', inset: 0, background: 'rgba(20,20,18,0.4)', zIndex: 250,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 16,
         }}>
-          <div style={{ ...card, padding: '20px 22px', maxWidth: 420, width: '100%' }}>
+          <div style={{ ...card, padding: '20px 22px', maxWidth: 420, width: '100%', marginBottom: 20 }}>
             <div style={{ ...type.eyebrow, marginBottom: 8 }}>Edit · {editingField.replace(/_/g, ' ')}</div>
             <EditInput
               field={editingField}
