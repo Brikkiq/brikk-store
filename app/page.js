@@ -470,4 +470,50 @@ export default function Home(){
       <footer style={{borderTop:`1px solid ${c.border}`,padding:"24px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",maxWidth:1120,margin:"0 auto",flexWrap:"wrap",gap:8}}>
         <span style={{fontSize:14,fontWeight:700}}>Brikk</span>
         <div style={{display:"flex",gap:20}}>
-          <a href="/login" style={{fontSize:12,color:c.sub}}>
+          <a href="/login" style={{fontSize:12,color:c.sub}}>Sign in</a>
+          <a href="/privacy" style={{fontSize:12,color:c.sub}}>Privacy</a>
+          <a href="/terms" style={{fontSize:12,color:c.sub}}>Terms</a>
+          <a href="mailto:hello@brikk.store" style={{fontSize:12,color:c.sub}}>Contact</a>
+        </div>
+      </footer>
+
+      {/* AI Help Chat — floating panel */}
+      {chatOpen && (
+        <div
+          onClick={(e)=>{if(e.target===e.currentTarget) setChatOpen(false)}}
+          style={{position:"fixed",inset:0,background:"rgba(20,20,18,0.5)",zIndex:200,display:"flex",alignItems:"flex-end",justifyContent:"center",padding:20}}
+        >
+          <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:12,maxWidth:480,width:"100%",height:"min(620px, 80vh)",display:"flex",flexDirection:"column",boxShadow:"0 10px 40px rgba(20,20,18,0.18)"}}>
+            <div style={{padding:"14px 18px",borderBottom:`1px solid ${c.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+              <div>
+                <div style={{fontSize:15,fontWeight:600}}>Ask AI about Brikk</div>
+                <div style={{fontSize:11,color:c.dim,marginTop:2}}>Pricing, features, setup — anything.</div>
+              </div>
+              <button onClick={()=>setChatOpen(false)} aria-label="Close" style={{background:"none",border:"none",fontSize:20,color:c.dim,cursor:"pointer",padding:4,lineHeight:1}}>×</button>
+            </div>
+            <div style={{flex:1,overflowY:"auto",padding:"14px 18px",display:"flex",flexDirection:"column",gap:10}}>
+              {chatHistory.map((m,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:m.role==='user'?"flex-end":"flex-start"}}>
+                  <div style={{maxWidth:"82%",padding:"10px 14px",borderRadius:m.role==='user'?"12px 12px 2px 12px":"12px 12px 12px 2px",background:m.role==='user'?c.text:c.bg,color:m.role==='user'?"#fff":c.text,border:m.role==='user'?"none":`1px solid ${c.border}`,fontSize:13.5,lineHeight:1.55,whiteSpace:"pre-wrap"}}>{m.content}</div>
+                </div>
+              ))}
+              {chatLoading && (
+                <div style={{fontSize:12,color:c.dim,fontStyle:"italic"}}>Thinking…</div>
+              )}
+            </div>
+            <div style={{padding:"12px 18px",borderTop:`1px solid ${c.border}`,display:"flex",gap:8}}>
+              <input
+                value={chatMsg}
+                onChange={e=>setChatMsg(e.target.value)}
+                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();handleChat()}}}
+                placeholder="Ask anything about Brikk…"
+                style={{flex:1,padding:"10px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit"}}
+              />
+              <button onClick={handleChat} disabled={!chatMsg.trim()||chatLoading} style={{background:c.text,border:"none",borderRadius:8,padding:"0 18px",fontSize:13,fontWeight:600,color:"#fff",cursor:chatMsg.trim()?"pointer":"default",opacity:chatMsg.trim()&&!chatLoading?1:0.5,fontFamily:"inherit"}}>Send</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
