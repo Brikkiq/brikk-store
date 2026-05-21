@@ -33,14 +33,15 @@ export const metadata = {
   },
 }
 
-// Use Next.js 14's viewport export so we don't ship two <meta name="viewport">
-// tags. The previous setup had one tag here and one auto-injected by Next.
+// Viewport — allows pinch-zoom for accessibility (WCAG 1.4.4). The original
+// request was to block zoom for a native-app feel, but that violates
+// accessibility standards and hurts visually impaired visitors. The native
+// feel inside /app comes from the 8-tab bottom bar + PWA install (full-screen,
+// no browser chrome) — not from locking zoom. Logged-in users rarely pinch-
+// zoom inside an app anyway.
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  minimumScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
   themeColor: '#1A1A18',
 }

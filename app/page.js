@@ -50,9 +50,9 @@ function LiveDemo(){
           <span style={{fontSize:11,color:c.dim}}>Live Preview</span>
         </div>
       </div>
-      <div style={{display:"flex",gap:2,padding:"8px 12px",borderBottom:`1px solid ${c.border}`,overflowX:"auto"}}>
+      <div style={{display:"flex",gap:2,padding:"8px 8px",borderBottom:`1px solid ${c.border}`,overflowX:"auto",scrollbarWidth:"none",msOverflowStyle:"none"}}>
         {screens.map(s=>(
-          <button key={s.id} onClick={()=>setScreen(s.id)} style={{background:screen===s.id?c.text:"transparent",color:screen===s.id?"#fff":c.dim,border:"none",borderRadius:4,padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>{s.label}</button>
+          <button key={s.id} onClick={()=>setScreen(s.id)} style={{background:screen===s.id?c.text:"transparent",color:screen===s.id?"#fff":c.dim,border:"none",borderRadius:4,padding:"4px 7px",fontSize:9.5,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap",flexShrink:0}}>{s.label}</button>
         ))}
       </div>
       <div style={{padding:"16px",minHeight:340}}>
@@ -68,7 +68,7 @@ function LiveDemo(){
           <div style={{fontSize:11,color:c.dim,marginBottom:12}}>You have 4 things that need your attention.</div>
           {[
             {icon:"!",label:"Call Sarah Mitchell — hot lead, 2 days since contact",color:c.red,bg:c.redSoft},
-            {icon:"AI",label:"Copilot has 3 follow-up drafts ready",color:"#6D28D9",bg:"rgba(109,40,217,0.05)"},
+            {icon:"AI",label:"Copilot has 2 follow-up drafts ready",color:"#6D28D9",bg:"rgba(109,40,217,0.05)"},
             {icon:"$",label:"742 Oak Ave — closing in 3 days",color:c.amber,bg:c.amberSoft},
             {icon:"→",label:"Reply to Emily — she replied 14m ago",color:c.green,bg:c.greenSoft},
           ].map((a,i)=>(
@@ -329,8 +329,10 @@ export default function Home(){
     <div style={{background:c.bg,color:c.text,fontFamily:"'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif"}}>
       <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 
-      {/* Nav */}
-      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px",maxWidth:1120,margin:"0 auto"}}>
+      {/* Sticky nav bar — full-width frosted background so footer→Features
+          smooth-scrolls reliably and so the user always has navigation. */}
+      <div style={{position:"sticky",top:0,zIndex:50,background:"rgba(250,250,249,0.88)",backdropFilter:"saturate(180%) blur(12px)",WebkitBackdropFilter:"saturate(180%) blur(12px)",borderBottom:`1px solid ${c.borderLight}`}}>
+      <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 20px",maxWidth:1120,margin:"0 auto"}}>
         <a href="/" style={{textDecoration:"none"}}><Logo size={18}/></a>
         <div style={{display:"flex",alignItems:"center",gap:20}}>
           <a href="#features" onClick={(e)=>navLinkClick(e,'#features')} className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
@@ -339,6 +341,7 @@ export default function Home(){
           <a href="/login" style={{fontSize:13,fontWeight:600,color:c.bg,background:c.text,padding:"8px 20px",borderRadius:6}}>Start Free</a>
         </div>
       </nav>
+      </div>
 
       {/* Hero */}
       <section className="mobile-pad-hero" style={{padding:"80px 32px 60px",maxWidth:1120,margin:"0 auto"}}>
@@ -484,7 +487,7 @@ export default function Home(){
           <p style={{fontSize:15,color:c.sub,marginBottom:24}}>Start free. Cancel anytime. No contracts.</p>
         </div>
         <div style={{maxWidth:1020,margin:"0 auto",textAlign:"center"}}>
-          <div className="pricing-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14,textAlign:"left"}}>
+          <div className="pricing-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14,textAlign:"left"}}>
             {/* Pro */}
             <div style={{background:c.white,border:`2px solid ${c.text}`,borderRadius:12,padding:"32px 28px",position:"relative"}}>
               <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:c.green,color:"#fff",fontSize:11,fontWeight:600,padding:"5px 18px",borderRadius:20}}>First 14 days free</div>
