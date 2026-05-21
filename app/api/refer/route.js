@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import { sendEmail, buildLeadConfirmationEmail } from '@/lib/email'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const serviceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// This route INSERTs leads on behalf of an agent for a public form submitter.
+// It must bypass RLS, so the service-role key is required. Hard-fail without it.
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 export async function POST(request) {
   try {
@@ -65,11 +66,14 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Failed to submit' }, { status: 500 })
     }
 
-    // Fire-and-forget — send a branded confirmation email back to the lead.
+    // Awaited — send a branded confirmation email back to the lead before responding.
     // The "from" name is the agent's name so it reads personal in the inbox.
-    // Reply-To points at the agent's auth email, so a reply lands in their inbox directly.
+    // Reply-To points at the agent's auth email so replies land in their inbox.
+    //
+    // We await rather than fire-and-forget because Vercel serverless functions can be
+    // killed the moment the HTTP response is returned, dropping any in-flight requests.
+    // Adds ~300-800ms to the response; acceptable for the better delivery guarantee.
     if (email) {
-      // Look up agent's auth email so we can set Reply-To
       let agentEmail = null
       try {
         const { data: userData } = await supabaseAdmin.auth.admin.getUserById(agent.id)
@@ -85,16 +89,15 @@ export async function POST(request) {
         agentBrokerage: agent.brokerage || '',
       })
 
-      sendEmail({
+      const result = await sendEmail({
         fromName: agent.full_name || 'Brikk',
         to: email,
         replyTo: agentEmail || undefined,
         subject,
         html,
         text,
-      }).then(result => {
-        if (!result.ok) console.warn('Lead confirmation email failed:', result.error)
       })
+      if (!result.ok) console.warn('Lead confirmation email failed:', result.error)
     }
 
     return NextResponse.json({ success: true })

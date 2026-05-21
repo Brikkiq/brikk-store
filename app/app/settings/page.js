@@ -479,7 +479,7 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
           borderRadius: 6, padding: '14px 16px',
         }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>Free trial active</div>
-          <div style={{ ...type.bodySub, marginTop: 2 }}>Full access to every feature for 45 days. No charge until your trial ends.</div>
+          <div style={{ ...type.bodySub, marginTop: 2 }}>Full access to every feature for 14 days. No charge until your trial ends.</div>
         </div>
       </Section>
 
@@ -508,7 +508,7 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
             saving={saving}
           />
         </div>
-        <div style={{ ...type.meta, marginTop: 14 }}>Payments secured by Stripe. 45-day free trial included. Cancel anytime.</div>
+        <div style={{ ...type.meta, marginTop: 14 }}>Payments secured by Stripe. 14-day free trial included. Cancel anytime.</div>
       </Section>
     </>
   )
@@ -719,148 +719,4 @@ const TeamTab = ({ user, showToast }) => {
       <>
         <Section
           title="Create a team"
-          description="If you're paying for a Team or Agency plan, set up your team here. You'll get a code to share with your agents so they can join without paying separately."
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
-            <Field label="Team name">
-              <input value={createName} onChange={e => setCreateName(e.target.value)} placeholder="Acme Realty Group" style={input} />
-            </Field>
-          </div>
-          <button onClick={handleCreate} disabled={busy || !createName.trim()} style={{ ...btn.primary, opacity: busy || !createName.trim() ? 0.5 : 1 }}>
-            {busy ? 'Creating…' : 'Create team'}
-          </button>
-        </Section>
-
-        <Section
-          title="Join a team"
-          description="Already have a team code from your team lead or brokerage? Enter it here to skip individual billing."
-        >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
-            <Field label="Team code">
-              <input
-                value={joinCode}
-                onChange={e => setJoinCode(e.target.value.toUpperCase())}
-                placeholder="TEAM-XXXX-YYYY"
-                style={{ ...input, fontFamily: 'ui-monospace, monospace', letterSpacing: '0.04em' }}
-              />
-            </Field>
-          </div>
-          <button onClick={handleJoin} disabled={busy || !joinCode.trim()} style={{ ...btn.secondary, opacity: busy || !joinCode.trim() ? 0.5 : 1 }}>
-            {busy ? 'Joining…' : 'Join team'}
-          </button>
-        </Section>
-      </>
-    )
-  }
-
-  // ---- Owner view ----
-  if (role === 'owner') {
-    const unlinked = !team.stripe_subscription_id && team.plan_tier !== 'agency'
-    return (
-      <>
-        {unlinked && (
-          <div style={{
-            background: c.amberSoft, border: `1px solid ${c.amberBorder}`,
-            borderRadius: 6, padding: '12px 14px', marginBottom: 12,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap',
-          }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 600, color: c.amber }}>This team isn't linked to a paid subscription</div>
-              <div style={{ ...type.bodySub, marginTop: 2 }}>
-                Subscribe to the Team plan to keep your team active. Until then your members still have access, but billing isn't covered.
-              </div>
-            </div>
-            <a href="?tab=billing" onClick={(e) => { e.preventDefault(); window.history.replaceState({}, '', '?tab=billing'); window.dispatchEvent(new Event('popstate')) }}
-               style={{ ...btn.primary, textDecoration: 'none', flexShrink: 0 }}>Subscribe</a>
-          </div>
-        )}
-        <Section title={team.name} description={`${team.plan_tier === 'agency' ? 'Agency' : 'Team'} plan · ${members.length} of ${team.max_seats} seats used`}>
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ ...inputLabel, marginBottom: 6 }}>Team code</div>
-            <div style={{
-              fontSize: 18, fontWeight: 600, letterSpacing: '0.04em',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-              background: c.bgInset, border: `1px solid ${c.border}`,
-              borderRadius: 6, padding: '12px 16px',
-              display: 'inline-block', marginBottom: 8,
-            }}>{team.team_code}</div>
-            <div style={{ ...type.meta }}>Share this code with your agents. They enter it during signup or in Settings → Team.</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <button onClick={() => { navigator.clipboard?.writeText(team.team_code); showToast('Code copied') }} style={btn.primary}>Copy code</button>
-              <button onClick={handleRegenerate} style={btn.secondary} disabled={busy}>Regenerate code</button>
-            </div>
-          </div>
-        </Section>
-
-        <Section title="Members" description="Agents currently on your team.">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {members.length === 0 && <div style={{ ...type.bodySub }}>No members yet. Share the team code above.</div>}
-            {members.map(m => (
-              <div key={m.id} style={{
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                padding: '10px 12px', borderRadius: 6,
-                border: `1px solid ${c.border}`, background: c.white,
-                gap: 12, flexWrap: 'wrap',
-              }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{m.full_name || 'Unnamed'}</div>
-                  <div style={{ ...type.meta }}>
-                    {m.team_role === 'owner' ? 'Owner' : 'Member'}
-                    {m.brokerage ? ` · ${m.brokerage}` : ''}
-                  </div>
-                </div>
-                {m.id !== user.id && (
-                  <button onClick={() => handleRemove(m.id, m.full_name)} style={{ ...btn.ghost, color: c.red }} disabled={busy}>
-                    Remove
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </Section>
-
-        <Section title="Danger zone">
-          <button onClick={handleDelete} style={btn.danger} disabled={busy}>
-            Delete team
-          </button>
-          <div style={{ ...type.meta, marginTop: 8 }}>
-            Members will be detached and revert to solo plans. Your billing isn't cancelled automatically — manage that in Stripe.
-          </div>
-        </Section>
-      </>
-    )
-  }
-
-  // ---- Member view ----
-  return (
-    <Section title={team.name} description={`You're a member of this ${team.plan_tier === 'agency' ? 'agency' : 'team'}. Billing is covered by your team owner.`}>
-      <div style={{
-        background: c.greenSoft, border: `1px solid ${c.greenBorder}`,
-        borderRadius: 6, padding: '14px 16px', marginBottom: 12,
-      }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: c.green }}>Plan covered by team</div>
-        <div style={{ ...type.bodySub, marginTop: 4 }}>
-          You don't have a personal subscription — your access comes from the {team.plan_tier === 'agency' ? 'agency' : 'team'} plan.
-        </div>
-      </div>
-      <button onClick={handleLeave} style={btn.danger} disabled={busy}>Leave team</button>
-    </Section>
-  )
-}
-
-const AgreementTab = () => (
-  <>
-    <Section title="Documents">
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <a href="/terms" target="_blank" rel="noreferrer" style={{ fontSize: 13, color: c.text }}>Terms of service →</a>
-        <a href="/privacy" target="_blank" rel="noreferrer" style={{ fontSize: 13, color: c.text }}>Privacy policy →</a>
-      </div>
-    </Section>
-    <Section title="Acceptable use">
-      <div style={{ ...type.bodySub }}>
-        By using Brikk you agree to use the service for legitimate real estate business. Review all AI-generated content before sending.
-        You are responsible for CAN-SPAM, TCPA, and local real estate compliance.
-      </div>
-    </Section>
-  </>
-)
+          description="If you're paying for a Team or Agency plan, set up your team here. You'll get a code to share with your agents so they can join witho

@@ -39,7 +39,7 @@ export async function POST(request) {
         cancel_url:  `${APP_URL}/app/settings?payment=cancelled`,
         customer_email: email || '',
         client_reference_id: userId || '',
-        'subscription_data[trial_period_days]': '45',
+        'subscription_data[trial_period_days]': '14',
         'line_items[0][price]': prices.monthly,
         'line_items[0][quantity]': '1',
         'line_items[1][price]': prices.setup,
@@ -56,15 +56,4 @@ export async function POST(request) {
       }).toString(),
     })
 
-    const session = await res.json()
-    if (session.error) {
-      console.error('Stripe error:', session.error)
-      return NextResponse.json({ error: session.error.message }, { status: 400 })
-    }
-
-    return NextResponse.json({ url: session.url, sessionId: session.id })
-  } catch (err) {
-    console.error('Stripe API error:', err?.message)
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
-  }
-}
+    const session = await r

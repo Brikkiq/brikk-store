@@ -42,10 +42,11 @@ export default function LeadDetailPage() {
   const load = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    // Every query scoped by user_id as defense-in-depth alongside RLS.
     const [leadRes, msgsRes, intsRes, dealsRes] = await Promise.all([
       supabase.from('leads').select('*').eq('id', leadId).eq('user_id', user.id).single(),
-      supabase.from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: true }),
-      supabase.from('interactions').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(50),
+      supabase.from('messages').select('*').eq('lead_id', leadId).eq('user_id', user.id).order('created_at', { ascending: true }),
+      supabase.from('interactions').select('*').eq('lead_id', leadId).eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
       supabase.from('deals').select('*').eq('user_id', user.id),
     ])
     if (leadRes.error) console.error('Load lead failed:', leadRes.error.message)

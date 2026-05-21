@@ -270,13 +270,13 @@ Return ONLY the JSON.`,
       const q = String(question).toLowerCase()
       const fallbacks = {
         'price|cost|how much|pricing|expensive|cheap|afford':
-          `Brikk Pro is $75/month for solo agents, Teams is $200/month for up to 5 agents, plus a one-time $125 setup fee. Your first 45 days are completely free — no credit card needed.`,
+          `Brikk Pro is $75/month for solo agents, Teams is $200/month for up to 5 agents, plus a one-time $125 setup fee. Your first 14 days are completely free — no credit card needed.`,
         'what is brikk|what does brikk do|point of this|purpose':
           `Brikk is the one screen you open every morning that tells you exactly what to do. It tracks your leads, drafts your follow-up messages with AI, manages your deals to closing, and shows you which marketing channels actually work.`,
         'feature|what can it do|capabilities|tools':
           `Brikk includes: AI Copilot for drafted follow-ups, Lead Pipeline with 18 realtor-specific fields, Deal Tracker with stage progression, Smart Calendar auto-populated from your pipeline, Marketing ROI analytics, in-app SMS Messages, Voice-to-CRM, and a Lead Capture Link for your business card.`,
         'trial|free|try it|test|demo':
-          `Yes — 45 days completely free with full access to every feature. No credit card required. Sign up at brikk.store/login.`,
+          `Yes — 14 days completely free with full access to every feature. No credit card required. Sign up at brikk.store/login.`,
         'safe|security|data|privacy|secure':
           `Your data is protected by Supabase row-level security — each agent only sees their own data. Everything is encrypted in transit. We never sell your data.`,
         'cancel|contract|commitment':
@@ -298,7 +298,7 @@ Return ONLY the JSON.`,
           system: `You are the AI assistant on Brikk's website (brikk.store), an AI-powered command center for real estate agents.
 
 Key facts:
-- Price: $75/mo Pro, $200/mo Teams (up to 5 seats), $125 one-time setup, 45-day free trial.
+- Price: $75/mo Pro, $200/mo Teams (up to 5 seats), $125 one-time setup, 14-day free trial.
 - Features: AI Copilot, Lead Pipeline (18 fields), Deal Tracker, Smart Calendar, Marketing ROI, in-app SMS, Voice-to-CRM, Lead Capture Link.
 - Competitors charge $300-500/mo.
 - Works on iPhone, Android, desktop.
@@ -314,7 +314,7 @@ Tone: warm, concise, honest. 2-3 sentences max unless they ask for detail. If un
       }
       return NextResponse.json({
         answer:
-          "Brikk is the AI command center for real estate agents — $75/mo with a 45-day free trial. What would you like to know — features, pricing, or how to get started?",
+          "Brikk is the AI command center for real estate agents — $75/mo with a 14-day free trial. What would you like to know — features, pricing, or how to get started?",
       })
     }
 
@@ -382,91 +382,4 @@ This is NOT a first contact. Read the conversation history below carefully. Your
 You're reaching out for the first time, or there's no logged history yet. Introduce yourself briefly. State one specific reason you're reaching out (their source, their stated need, your local expertise). Make the ask small.`
 }
 
-LEAD CONTEXT:
-- Name: ${lead.name}
-- Buyer or Seller: ${lead.lead_type || 'Buyer'}
-- How they came in: ${lead.source || 'Unknown source'}
-- Temperature: ${lead.temperature || 'warm'}
-- Pipeline stage: ${lead.stage || 'New Lead'}
-- Price range: ${lead.price_range || 'Not specified'}
-- Days since you last contacted them: ${daysSinceContact}
-- Preferred area: ${lead.preferred_area || 'Not specified'}
-- Bedrooms wanted: ${lead.bedrooms || 'Not specified'}
-- Pre-approved: ${lead.pre_approved ? 'Yes' + (lead.pre_approved_amount ? ' at ' + lead.pre_approved_amount : '') : 'Not on file'}
-- Timeline: ${lead.timeline || 'Not specified'}
-- Contact preference: ${lead.contact_preference || 'text'}
-- Notes: ${lead.notes || 'None'}${historyContext}${interactionContext}
-
-URGENCY HINT:
-${lead.temperature === 'hot' && daysSinceContact >= 2 ? '⚠ Hot lead, gone cold for several days. Create urgency without being pushy.' : ''}
-${daysSinceContact >= 7 ? '⚠ Long gap since contact. Acknowledge the time gap honestly or offer a clear reason for reaching out now (new listings, market shift, an answer to a question they asked).' : ''}
-${(lead.recent_messages || []).filter(m => m.direction === 'inbound').length >= 2 ? '📈 They\'ve been actively engaging. Match their energy — be more direct, suggest a concrete next step like a showing time.' : ''}
-
-Respond with ONLY a valid JSON object. No markdown, no commentary.
-{
-  "message": "the SMS-ready draft",
-  "reason": "one sentence on why this message, why now, and what signal from their history shaped it"
-}`
-
-      const fallback = () => ({
-        lead_id: lead.id,
-        lead_name: lead.name,
-        lead_type: lead.lead_type,
-        temperature: lead.temperature,
-        source: lead.source,
-        stage: lead.stage,
-        days_since_contact: daysSinceContact,
-        channel: daysSinceContact > 7 ? 'Email' : 'Text',
-        urgency: 'medium',
-        draft: `Hi ${lead.name}, this is ${agentName || 'Alex'}. Wanted to reach out${lead.price_range ? ' about properties in the ' + lead.price_range + ' range' : ''} — I have a few options I think you'd want to see. Got a few minutes this week?`,
-        reason: `${daysSinceContact} days without contact. Auto-generated fallback — please edit before sending.`,
-      })
-
-      try {
-        const data = await callClaude({
-          model: MODEL,
-          max_tokens: 200,
-          messages: [{ role: 'user', content: prompt }],
-        })
-        const text = data.content?.[0]?.text || ''
-        const parsed = safeJson(text)
-        const draftMessage = parsed?.message || ''
-        const draftReason = parsed?.reason || `${daysSinceContact} days since contact.`
-
-        if (!draftMessage) {
-          drafts.push(fallback())
-          continue
-        }
-
-        drafts.push({
-          lead_id: lead.id,
-          lead_name: lead.name,
-          lead_type: lead.lead_type,
-          temperature: lead.temperature,
-          source: lead.source,
-          stage: lead.stage,
-          days_since_contact: daysSinceContact,
-          channel: daysSinceContact > 7 ? 'Email' : 'Text',
-          urgency:
-            lead.temperature === 'hot' && daysSinceContact >= 2
-              ? 'high'
-              : daysSinceContact >= 5
-              ? 'high'
-              : daysSinceContact >= 3
-              ? 'medium'
-              : 'low',
-          draft: draftMessage,
-          reason: draftReason,
-        })
-      } catch (err) {
-        console.error('Draft generation failed for', lead.name, err.message)
-        drafts.push(fallback())
-      }
-    }
-
-    return NextResponse.json({ drafts })
-  } catch (error) {
-    console.error('Copilot API error:', error)
-    return NextResponse.json({ error: 'Failed to generate drafts' }, { status: 500 })
-  }
-}
+LEAD 

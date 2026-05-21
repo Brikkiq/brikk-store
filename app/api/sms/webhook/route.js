@@ -8,8 +8,10 @@ import twilio from 'twilio'
 const twilioAuthToken = process.env.TWILIO_AUTH_TOKEN
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// Legacy route — must bypass RLS to write inbound messages on behalf of any
+// agent based on phone-number match. Service-role key is required when this
+// route is in use.
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 const emptyResponse = () =>
   new Response('<Response></Response>', {

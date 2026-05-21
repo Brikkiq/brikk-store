@@ -16,6 +16,30 @@ export const metadata = {
     description: 'The command center for real estate agents.',
   },
   manifest: '/manifest.json',
+  applicationName: 'Brikk',
+  appleWebApp: {
+    capable: true,
+    title: 'Brikk',
+    statusBarStyle: 'black-translucent',
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/icon-180.png' }],
+  },
+}
+
+// Use Next.js 14's viewport export so we don't ship two <meta name="viewport">
+// tags. The previous setup had one tag here and one auto-injected by Next.
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
   themeColor: '#1A1A18',
 }
 
@@ -24,17 +48,6 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <head>
         <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <meta
-          name="viewport"
-          content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, shrink-to-fit=no"
-        />
-        <meta name="format-detection" content="telephone=no" />
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="Brikk" />
-        <link rel="apple-touch-icon" href="/icon-180.png" />
         <script src="/native-bridge.js" defer></script>
       </head>
       <body>{children}</body>

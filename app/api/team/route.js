@@ -3,8 +3,10 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-const serviceKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+// Service-role key is required for this route. We do NOT fall back to the anon
+// key — falling back would create silent permission-mismatch bugs where the
+// route appears to work but can't bypass RLS as intended.
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 const TEAM_PLAN_SEATS = { team: 5, agency: 999 }
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'

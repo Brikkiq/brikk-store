@@ -45,8 +45,14 @@ export default function MessagesPage() {
   }
 
   const loadMessages = async (leadId) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    // Belt-and-suspenders: RLS already enforces user_id, but we filter here too
+    // so a misconfigured RLS policy can't leak other agents' messages.
     const { data } = await supabase.from('messages').select('*')
-      .eq('lead_id', leadId).order('created_at', { ascending: true })
+      .eq('lead_id', leadId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true })
     setMessages(data || [])
   }
 

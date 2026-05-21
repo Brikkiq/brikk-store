@@ -137,15 +137,29 @@ export async function GET(request) {
     return NextResponse.json({ ok: true, processed: 0 })
   }
 
-  // Pull all auth users in one go so we can map id → email
-  const { data: authList } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  // Pull all auth users with pagination — the listUsers API caps each page,
+  // so we keep fetching until a page comes back empty.
   const emailById = {}
-  for (const u of (authList?.users || [])) emailById[u.id] = u.email
+  for (let page = 1; page <= 50; page++) {
+    const { data: authList } = await supabase.auth.admin.listUsers({ page, perPage: 200 })
+    const users = authList?.users || []
+    if (users.length === 0) break
+    for (const u of users) emailById[u.id] = u.email
+    if (users.length < 200) break
+  }
 
   let sent = 0
   let skipped = 0
+  const startedAt = Date.now()
+  const MAX_RUNTIME_MS = 55_000  // bail before Vercel's 60s cron timeout
 
   for (const p of profiles) {
+    // Time guard — stop processing if we're about to hit the timeout. Better to
+    // skip the last few users than have the function killed mid-send.
+    if (Date.now() - startedAt > MAX_RUNTIME_MS) {
+      skipped++
+      continue
+    }
     const agentEmail = emailById[p.id]
     if (!agentEmail) { skipped++; continue }
     const firstName = (p.full_name || '').split(' ')[0] || ''
@@ -197,9 +211,13 @@ export async function GET(request) {
       })
       .slice(0, 3)
 
+    // Parallel draft generation — three Anthropic calls fan out simultaneously instead
+    // of running serially. Cuts per-user latency from ~6s to ~2s.
+    const draftResults = await Promise.all(
+      draftCandidates.map(lead => draftMessage(lead, p.full_name).then(text => ({ lead, text })))
+    )
     const drafts = []
-    for (const lead of draftCandidates) {
-      const text = await draftMessage(lead, p.full_name)
+    for (const { lead, text } of draftResults) {
       if (!text) continue
       const phone = lead.phone ? String(lead.phone).replace(/[^0-9+]/g, '') : null
       const smsUrl = phone ? `sms:${phone}?body=${encodeURIComponent(text)}` : null

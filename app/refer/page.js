@@ -2,171 +2,211 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+import { c, type, card, btn, input, inputLabel } from '@/lib/design'
+import { Logo } from '@/lib/Logo'
 
-const c={bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",green:"#16803C",greenSoft:"rgba(22,128,60,0.06)",greenBorder:"rgba(22,128,60,0.15)",red:"#BE123C",redSoft:"rgba(190,18,60,0.06)"}
+// Legacy referral page. The newer flow is /r/CODE which uses friendly short codes.
+// This page is kept for compatibility — older share links carry ?agent=<uuid>.
+// If no agent param is present, we show a generic "no agent attached" message
+// instead of silently routing to the first agent in the DB (which used to leak
+// real names to random visitors).
 
-export default function ReferPage(){
-  const [agents,setAgents]=useState([])
-  const [loading,setLoading]=useState(true)
-  const [submitted,setSubmitted]=useState(false)
-  const [error,setError]=useState(null)
-  const [form,setForm]=useState({name:'',phone:'',email:'',type:'Buyer',price:'',notes:'',agent_id:''})
+export default function ReferPage() {
+  const [agent, setAgent] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [submitted, setSubmitted] = useState(false)
+  const [error, setError] = useState(null)
+  const [form, setForm] = useState({
+    name: '', phone: '', email: '',
+    type: 'Buyer', price: '', notes: '',
+  })
 
-  useEffect(()=>{
-    loadAgents()
-    // Check URL for agent param
-    if(typeof window!=='undefined'){
-      const params=new URLSearchParams(window.location.search)
-      const agentId=params.get('agent')
-      if(agentId)setForm(f=>({...f,agent_id:agentId}))
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const agentId = params.get('agent')
+    if (!agentId) {
+      setLoading(false)
+      return
     }
-  },[])
+    // Fetch ONLY this specific agent — never bulk-list all agents.
+    (async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, brokerage, referral_code')
+        .eq('id', agentId)
+        .maybeSingle()
+      if (data) setAgent(data)
+      setLoading(false)
+    })()
+  }, [])
 
-  const loadAgents=async()=>{
-    const {data}=await supabase.from('profiles').select('id,full_name,email,brokerage')
-    setAgents(data||[])
-    setLoading(false)
-  }
-
-  const handleSubmit=async()=>{
-    if(!form.name||!form.phone){setError('Please enter your name and phone number.');return}
+  const handleSubmit = async () => {
+    if (!form.name || !form.phone) { setError('Please enter your name and phone number.'); return }
+    if (!agent) { setError('This link is missing an agent. Please ask for an updated link.'); return }
     setError(null)
-
-    try{
-      const res=await fetch('/api/refer',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          name:form.name,
-          phone:form.phone,
-          email:form.email||null,
-          type:form.type,
-          price:form.price||null,
-          notes:form.notes?`[Submitted via referral link] ${form.notes}`:'[Submitted via referral link]',
-          agent_id:form.agent_id||(agents.length>0?agents[0].id:null)
-        })
+    try {
+      const res = await fetch('/api/refer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          email: form.email || null,
+          type: form.type === 'Both' ? 'Buyer' : form.type,
+          price: form.price || null,
+          notes: form.notes ? `[Submitted via referral link] ${form.notes}` : '[Submitted via referral link]',
+          agent_id: agent.id,
+        }),
       })
-      const data=await res.json()
-      if(data.error){
-        setError('Something went wrong. Please try again or call directly.')
-      }else{
-        setSubmitted(true)
-      }
-    }catch(err){
+      const data = await res.json()
+      if (data.error) setError('Something went wrong. Please try again or call directly.')
+      else setSubmitted(true)
+    } catch {
       setError('Something went wrong. Please try again or call directly.')
     }
   }
 
-  const agent=form.agent_id?agents.find(a=>a.id===form.agent_id):agents[0]
+  if (loading) {
+    return <Shell><div style={{ padding: 60, textAlign: 'center', color: c.dim, fontSize: 13 }}>Loading…</div></Shell>
+  }
 
-  if(loading)return(
-    <div style={{background:c.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Instrument Sans',sans-serif"}}>
-      <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-      <div style={{fontSize:14,color:c.dim}}>Loading...</div>
-    </div>
-  )
-
-  if(submitted)return(
-    <div style={{background:c.bg,minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Instrument Sans',-apple-system,sans-serif",padding:20}}>
-      <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-      <div style={{maxWidth:440,width:"100%",textAlign:"center"}}>
-        <div style={{width:64,height:64,borderRadius:"50%",background:c.greenSoft,border:`2px solid ${c.green}`,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 20px",fontSize:24}}>
-          ✓
-        </div>
-        <h1 style={{fontSize:24,fontWeight:700,margin:"0 0 12px"}}>Thanks, {form.name.split(' ')[0]}!</h1>
-        <p style={{fontSize:15,color:c.sub,lineHeight:1.7,margin:"0 0 8px"}}>
-          {agent?.full_name||'Your agent'} has received your information and will be in touch shortly.
-        </p>
-        <p style={{fontSize:13,color:c.dim}}>
-          You can expect a call or text within 24 hours.
-        </p>
-        {agent?.brokerage&&<p style={{fontSize:12,color:c.dim,marginTop:20}}>{agent.brokerage}</p>}
-      </div>
-    </div>
-  )
-
-  return(
-    <div style={{background:c.bg,minHeight:"100vh",fontFamily:"'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif",padding:20}}>
-      <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-      
-      <div style={{maxWidth:480,margin:"40px auto"}}>
-        {/* Header */}
-        <div style={{textAlign:"center",marginBottom:32}}>
-          {agent?.full_name&&(
-            <div style={{width:56,height:56,borderRadius:"50%",background:c.text,display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:18,fontWeight:700,color:"#fff"}}>
-              {agent.full_name.split(' ').map(n=>n[0]).join('').slice(0,2)}
-            </div>
-          )}
-          <h1 style={{fontSize:24,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>
-            {agent?.full_name?`Work with ${agent.full_name}`:'Get Started'}
-          </h1>
-          <p style={{fontSize:14,color:c.sub,margin:0,lineHeight:1.6}}>
-            {agent?.brokerage?`${agent.brokerage} — `:''}Tell me about what you're looking for and I'll be in touch within 24 hours.
+  // No agent specified — show neutral landing without exposing any agent name
+  if (!agent) {
+    return (
+      <Shell>
+        <div style={{ maxWidth: 440, margin: '60px auto', textAlign: 'center', padding: 20 }}>
+          <Logo size={22} />
+          <h1 style={{ ...type.pageTitle, fontSize: 22, marginTop: 20 }}>This link is missing an agent</h1>
+          <p style={{ ...type.bodySub, marginTop: 8 }}>
+            The link you followed doesn't include an agent reference. Ask the person who shared it for an updated link, or visit{' '}
+            <a href="/" style={{ color: c.text, textDecoration: 'underline' }}>brikk.store</a> to learn more.
           </p>
         </div>
+      </Shell>
+    )
+  }
 
-        {/* Form */}
-        <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:10,padding:"28px 24px"}}>
-          <div style={{marginBottom:16}}>
-            <label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Your Name *</label>
-            <input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Sarah Mitchell"
-              style={{width:"100%",padding:"12px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-          </div>
+  if (submitted) {
+    return (
+      <Shell>
+        <div style={{ maxWidth: 440, margin: '60px auto', textAlign: 'center', padding: 20 }}>
+          <Logo size={20} />
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%',
+            background: c.greenSoft, border: `1px solid ${c.greenBorder}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '24px auto 20px', color: c.green, fontSize: 22,
+          }}>✓</div>
+          <h1 style={{ ...type.pageTitle, fontSize: 22, margin: '0 0 8px' }}>Thanks, {form.name.split(' ')[0]}.</h1>
+          <p style={{ ...type.bodySub, margin: '0 0 6px' }}>
+            <strong style={{ color: c.text }}>{agent.full_name}</strong>{agent.brokerage ? ` at ${agent.brokerage}` : ''} will reach out shortly.
+          </p>
+          <p style={{ ...type.meta, marginTop: 24 }}>You can close this page.</p>
+        </div>
+      </Shell>
+    )
+  }
 
-          <div style={{marginBottom:16}}>
-            <label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Phone Number *</label>
-            <input type="tel" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})} placeholder="(801) 555-0142"
-              style={{width:"100%",padding:"12px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-          </div>
+  return (
+    <Shell>
+      <div style={{ maxWidth: 480, margin: '40px auto', padding: 20 }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <Logo size={20} />
+        </div>
 
-          <div style={{marginBottom:16}}>
-            <label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Email</label>
-            <input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} placeholder="sarah@email.com"
-              style={{width:"100%",padding:"12px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-          </div>
-
-          <div style={{marginBottom:16}}>
-            <label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>I'm looking to...</label>
-            <div style={{display:"flex",gap:8}}>
-              {['Buyer','Seller','Both'].map(t=>(
-                <button key={t} onClick={()=>setForm({...form,type:t})}
-                  style={{flex:1,padding:"10px",borderRadius:8,border:`1px solid ${form.type===t?c.text:c.border}`,background:form.type===t?c.text:"transparent",color:form.type===t?"#fff":c.sub,fontSize:13,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>
-                  {t==='Buyer'?'Buy':t==='Seller'?'Sell':'Both'}
-                </button>
-              ))}
+        <div style={{ ...card, padding: '28px 24px' }}>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 18, fontWeight: 600, letterSpacing: '-0.015em', marginBottom: 4 }}>
+              Work with {agent.full_name}
+            </div>
+            <div style={{ ...type.bodySub }}>
+              {agent.brokerage ? `${agent.brokerage} · ` : ''}Tell them what you're looking for and they'll reach out — usually within an hour.
             </div>
           </div>
 
-          <div style={{marginBottom:16}}>
-            <label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Price Range</label>
-            <input value={form.price} onChange={e=>setForm({...form,price:e.target.value})} placeholder="$300K - $450K"
-              style={{width:"100%",padding:"12px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",boxSizing:"border-box"}}/>
-          </div>
+          <Field label="Your name *">
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Sarah Mitchell" style={input} />
+          </Field>
+          <Field label="Phone *">
+            <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(801) 555-0142" style={input} />
+          </Field>
+          <Field label="Email">
+            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@email.com" style={input} />
+          </Field>
+          <Field label="I'm a">
+            <div style={{ display: 'flex', gap: 6 }}>
+              {['Buyer', 'Seller', 'Both'].map(t => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setForm({ ...form, type: t })}
+                  style={{
+                    flex: 1, height: 36, borderRadius: 6,
+                    border: `1px solid ${form.type === t ? c.text : c.border}`,
+                    background: form.type === t ? c.text : c.white,
+                    color: form.type === t ? c.white : c.sub,
+                    fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >{t}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="Price range">
+            <input value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} placeholder="$300K – $450K" style={input} />
+          </Field>
+          <Field label="Anything else they should know?">
+            <textarea
+              value={form.notes}
+              onChange={e => setForm({ ...form, notes: e.target.value })}
+              placeholder="Looking for 3+ bedrooms near downtown, pre-approved, need to move by August…"
+              rows={3}
+              style={{ ...input, height: 'auto', padding: '10px 12px', resize: 'vertical' }}
+            />
+          </Field>
 
-          <div style={{marginBottom:20}}>
-            <label style={{fontSize:12,fontWeight:600,color:c.sub,display:"block",marginBottom:6}}>Anything else I should know?</label>
-            <textarea value={form.notes} onChange={e=>setForm({...form,notes:e.target.value})} placeholder="Looking for 3+ bedrooms near downtown, pre-approved, need to move by August..." rows={3}
-              style={{width:"100%",padding:"12px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/>
-          </div>
+          {error && (
+            <div style={{ background: c.redSoft, border: `1px solid ${c.redBorder}`, color: c.red, borderRadius: 6, padding: '10px 12px', fontSize: 12.5, marginBottom: 12 }}>
+              {error}
+            </div>
+          )}
 
-          {error&&<div style={{background:c.redSoft,borderRadius:6,padding:"10px 14px",marginBottom:16,fontSize:13,color:c.red}}>{error}</div>}
-
-          <button onClick={handleSubmit}
-            style={{width:"100%",background:c.text,border:"none",borderRadius:8,padding:"14px 0",fontSize:14,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit"}}>
+          <button onClick={handleSubmit} style={{ ...btn.primary, width: '100%', height: 40 }}>
             Submit
           </button>
 
-          <p style={{fontSize:11,color:c.dim,textAlign:"center",marginTop:12}}>
-            Your information is private and only shared with {agent?.full_name||'your agent'}.
-          </p>
+          {/* TCPA + privacy disclosure — required for compliant lead capture
+              that may result in SMS or phone contact. */}
+          <div style={{ marginTop: 16, padding: '12px 14px', background: c.bgInset, borderRadius: 6, border: `1px solid ${c.borderLight}` }}>
+            <p style={{ fontSize: 11, color: c.dim, lineHeight: 1.6, margin: 0 }}>
+              By submitting this form, you consent to be contacted by {agent.full_name}
+              {agent.brokerage ? ` at ${agent.brokerage}` : ''} by phone, text, or email
+              about real estate services. Standard messaging rates may apply. Consent is not a
+              condition of purchase. You can opt out at any time by replying STOP to any text.
+              Your information is private — see our{' '}
+              <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: c.sub, textDecoration: 'underline' }}>Privacy Policy</a>{' '}
+              and{' '}
+              <a href="/terms" target="_blank" rel="noreferrer" style={{ color: c.sub, textDecoration: 'underline' }}>Terms</a>.
+            </p>
+          </div>
         </div>
 
-        {/* Powered by */}
-        <div style={{textAlign:"center",marginTop:24}}>
-          <span style={{fontSize:11,color:c.dim}}>Powered by </span>
-          <a href="/" style={{fontSize:11,fontWeight:600,color:c.text}}>Brikk</a>
+        <div style={{ textAlign: 'center', marginTop: 20 }}>
+          <a href="/" style={{ ...type.meta }}>Powered by Brikk</a>
         </div>
       </div>
-    </div>
+    </Shell>
   )
 }
+
+const Shell = ({ children }) => (
+  <div style={{ background: c.bg, minHeight: '100vh', color: c.text, fontFamily: "'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif" }}>
+    {children}
+  </div>
+)
+
+const Field = ({ label, children }) => (
+  <div style={{ marginBottom: 12 }}>
+    <label style={inputLabel}>{label}</label>
+    {children}
+  </div>
+)

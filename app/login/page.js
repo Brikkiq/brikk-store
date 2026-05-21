@@ -139,7 +139,7 @@ export default function Login() {
             <Logo size={22} />
           </a>
           <div style={{ ...type.bodySub, marginTop: 10 }}>
-            {mode === 'login' ? 'Welcome back.' : 'Start your 45-day free trial.'}
+            {mode === 'login' ? 'Welcome back.' : 'Start your 14-day free trial.'}
           </div>
           {mode === 'signup' && (
             <div style={{ fontSize: 12, color: c.green, fontWeight: 500, marginTop: 4 }}>
@@ -255,7 +255,11 @@ export default function Login() {
 
         <div style={{ textAlign: 'center', marginTop: 20, display: 'flex', flexDirection: 'column', gap: 6 }}>
           <a href="/" style={{ ...type.meta }}>Back to brikk.store</a>
-          <span style={{ fontSize: 11, color: c.faint }}>By signing up you agree to Brikk's Terms.</span>
+          <span style={{ fontSize: 11, color: c.faint }}>
+            By signing up you agree to Brikk's{' '}
+            <a href="/terms" style={{ color: c.dim, textDecoration: 'underline' }}>Terms</a> and{' '}
+            <a href="/privacy" style={{ color: c.dim, textDecoration: 'underline' }}>Privacy Policy</a>.
+          </span>
         </div>
       </div>
     </Shell>

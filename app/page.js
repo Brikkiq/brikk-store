@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts"
 import { Logo } from '@/lib/Logo'
 
@@ -148,7 +148,34 @@ export default function Home(){
   const [chatMsg,setChatMsg]=useState("")
   const [chatHistory,setChatHistory]=useState([{role:'assistant',content:"Hey! I'm Brikk's AI assistant. Ask me anything — pricing, features, how to install the app on your phone, or how it all works. I'm here to help!"}])
   const [chatLoading,setChatLoading]=useState(false)
-  const handleSubmit=()=>{if(email.includes("@"))setSubmitted(true)}
+  const [emailError,setEmailError]=useState(null)
+
+  // Validate + submit the hero email capture. Shows an inline error if the
+  // address is missing or malformed.
+  const handleSubmit=()=>{
+    const trimmed=email.trim()
+    if(!trimmed){ setEmailError("Enter your email to start the free trial."); return }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)){ setEmailError("That doesn't look like a valid email."); return }
+    setEmailError(null)
+    setSubmitted(true)
+  }
+
+  // Fix anchor links that don't trigger scroll on direct URL load or while
+  // already on the homepage. Listens for hash changes + scrolls on first load
+  // if a hash is present.
+  useEffect(()=>{
+    if(typeof window==='undefined') return
+    const scrollToHash=()=>{
+      const hash=window.location.hash
+      if(!hash) return
+      const el=document.querySelector(hash)
+      if(el) el.scrollIntoView({behavior:'smooth',block:'start'})
+    }
+    // Defer to next tick so layout is settled
+    setTimeout(scrollToHash, 50)
+    window.addEventListener('hashchange', scrollToHash)
+    return ()=>window.removeEventListener('hashchange', scrollToHash)
+  },[])
 
   const handleChat=async()=>{
     if(!chatMsg.trim()||chatLoading)return
@@ -171,9 +198,9 @@ export default function Home(){
   const faqs=[
     {q:"Is this another CRM?",a:"No. Brikk is the one screen you open every morning that tells you what to do. It's simpler than a CRM, smarter than a spreadsheet, and costs a fraction of what you're paying now."},
     {q:"How does AI Copilot work?",a:"Copilot reads each lead's full context — their temperature, how long since you've been in touch, their stage, their notes — and drafts a personalized message. You tap approve, edit, or skip. That's it."},
-    {q:"Can I actually text leads from the app?",a:"Yes. Brikk has a built-in messaging system. You can draft messages manually or let AI write them, then send directly to your lead's phone number. SMS delivery is included."},
+    {q:"Can I actually text leads from the app?",a:"Yes. You draft a message in Brikk (or let AI write it), tap Send via Messages, and your phone's native texting app opens with the message and recipient pre-filled. You send it from your own number, on your own carrier. Brikk logs the message to that lead's history automatically. This sidesteps carrier registration and TCPA risk that comes with platform-sent SMS."},
     {q:"Does it work on my phone?",a:"Yes. Brikk is a Progressive Web App. Add it to your home screen on iPhone or Android and it works like a native app with a bottom tab bar. No app store needed."},
-    {q:"Is the first 45 days really free?",a:"Yes. No credit card to start. Full access to every feature for 45 days. If it doesn't help you close more deals, you owe nothing."},
+    {q:"Is the first 14 days really free?",a:"Yes. No credit card to start. Full access to every feature for 14 days. If it doesn't help you close more deals, you owe nothing."},
     {q:"How is this different from Lofty or Follow Up Boss?",a:"Those platforms cost $300-500/month, require hours of training, and are built for large brokerages. Brikk is $75/month, takes 5 minutes to set up, and is built for solo agents and small teams who want AI that actually does things — not just stores data."},
     {q:"What about my existing leads?",a:"Add them manually in about 2 minutes each, or share your referral link and new leads flow in automatically. We're building CSV import for the next update."},
     {q:"Does the AI learn over time?",a:"The more you use Brikk, the more context AI has about your leads, your deals, and your patterns. After 90 days, it knows your business better than any CRM you've ever used."},
@@ -188,7 +215,7 @@ export default function Home(){
         <a href="/" style={{textDecoration:"none"}}><Logo size={18}/></a>
         <div style={{display:"flex",alignItems:"center",gap:20}}>
           <a href="#features" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
-          <a href="#how" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>How It Works</a>
+          <a href="#how" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Get started</a>
           <a href="#pricing" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Pricing</a>
           <a href="/login" style={{fontSize:13,fontWeight:600,color:c.bg,background:c.text,padding:"8px 20px",borderRadius:6}}>Start Free</a>
         </div>
@@ -199,7 +226,7 @@ export default function Home(){
         <div style={{display:"flex",gap:48,alignItems:"center",flexWrap:"wrap"}}>
           <div style={{flex:"1 1 320px",maxWidth:460}}>
             <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
-              <span style={{fontSize:12,fontWeight:600,color:c.green}}>First 45 days free — no credit card</span>
+              <span style={{fontSize:12,fontWeight:600,color:c.green}}>First 14 days free — no credit card</span>
             </div>
             <h1 style={{fontSize:"clamp(34px,5vw,50px)",fontWeight:700,letterSpacing:"-0.03em",lineHeight:1.08,margin:"0 0 20px"}}>
               One screen.<br/>Every lead.<br/>AI that acts.
@@ -208,14 +235,24 @@ export default function Home(){
               Brikk is the command center for real estate agents who are tired of juggling 8 apps and losing leads. Add your leads, and AI handles the follow-ups you keep forgetting.
             </p>
             <p style={{fontSize:14,fontWeight:600,color:c.text,margin:"0 0 28px"}}>
-              $75/month. Not $300. Not $500. And the first 45 days are free.
+              $75/month. Not $300. Not $500. And the first 14 days are free.
             </p>
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               {!submitted?<>
-                <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:"100%",maxWidth:240,minWidth:180,outline:"none",fontFamily:"inherit",flex:"1 1 180px"}}/>
-                <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 45 Days Free</button>
+                <input
+                  type="email"
+                  placeholder="Your email"
+                  value={email}
+                  onChange={e=>{setEmail(e.target.value); if(emailError) setEmailError(null)}}
+                  onKeyDown={e=>{if(e.key==='Enter') handleSubmit()}}
+                  style={{background:c.white,border:`1px solid ${emailError?c.red:c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:"100%",maxWidth:240,minWidth:180,outline:"none",fontFamily:"inherit",flex:"1 1 180px"}}
+                />
+                <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 14 Days Free</button>
               </>:<div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"14px 28px",fontSize:14,color:c.green,fontWeight:600}}>You're in. Check your email.</div>}
             </div>
+            {emailError && !submitted && (
+              <div style={{fontSize:12,color:c.red,marginTop:8,fontWeight:500}}>{emailError}</div>
+            )}
           </div>
           <div style={{flex:"1 1 480px",maxWidth:580}}><LiveDemo/></div>
         </div>
@@ -223,10 +260,15 @@ export default function Home(){
 
       {/* Stats */}
       <div style={{borderTop:`1px solid ${c.border}`,borderBottom:`1px solid ${c.border}`,padding:"24px 0"}}>
-        <div style={{maxWidth:1120,margin:"0 auto",padding:"0 20px",display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
-          {[["78%","of buyers pick the first agent who responds"],["15 hrs","average agent response time"],["80%","of sales happen after the 5th follow-up"],["$75/mo","vs $300-500 for competitors"]].map(([val,desc],i)=>(
-            <div key={i} style={{textAlign:"center",flex:"1 1 140px"}}><div style={{fontSize:22,fontWeight:700}}>{val}</div><div style={{fontSize:11,color:c.dim,marginTop:4}}>{desc}</div></div>
-          ))}
+        <div style={{maxWidth:1120,margin:"0 auto",padding:"0 20px"}}>
+          <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
+            {[["78%","of buyers pick the first agent who responds"],["15 hrs","average agent response time"],["80%","of sales happen after the 5th follow-up"],["$75/mo","vs $300-500 for competitors"]].map(([val,desc],i)=>(
+              <div key={i} style={{textAlign:"center",flex:"1 1 140px"}}><div style={{fontSize:22,fontWeight:700}}>{val}</div><div style={{fontSize:11,color:c.dim,marginTop:4}}>{desc}</div></div>
+            ))}
+          </div>
+          <div style={{textAlign:"center",fontSize:10,color:c.dim,marginTop:14,letterSpacing:"0.02em"}}>
+            Sources: NAR Profile of Home Buyers (2024); WAV Group lead-response study; Marketing Donut sales-cadence research.
+          </div>
         </div>
       </div>
 
@@ -295,8 +337,9 @@ export default function Home(){
               ["Deal Tracker","Track every deal from contract to closing. Visual stage progression. Close date countdown. Commission tracking toward your annual goal."],
               ["Smart Calendar","Auto-populated from your leads and deals. Follow-up reminders, closing deadlines, and milestone alerts with AI context for every event."],
               ["Marketing ROI","See which lead sources actually produce closings — not just lead count. Pie charts, conversion tables, and AI insights on where to focus."],
-              ["Messages","Send texts to leads directly from the app. AI drafts messages for you. Full conversation history per lead. SMS delivery when connected."],
-              ["Lead Capture Link","A shareable page at brikk.store/refer that anyone can fill out. Leads go straight to your pipeline. Put it on your business card, Instagram, email signature."],
+              ["Conversations","Draft a message in Brikk, send it from your own phone with one tap. AI suggests replies based on the lead's history. Every exchange is logged."],
+              ["Voice-to-CRM","Tap the mic. Speak naturally about a lead — what you texted, what they replied, a price change. AI parses it into structured updates you review and approve."],
+              ["Lead Capture Link","A short URL like brikk.store/r/YOUR-CODE that anyone can fill out. Submissions land in your pipeline and you get a live alert. Put it on your business card or in your Instagram bio."],
             ].map(([title,desc],i)=>(
               <div key={i} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"22px 20px"}}>
                 <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>{title}</div>
@@ -324,17 +367,17 @@ export default function Home(){
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
             {/* Pro */}
             <div style={{background:c.white,border:`2px solid ${c.text}`,borderRadius:12,padding:"32px 28px",position:"relative"}}>
-              <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:c.green,color:"#fff",fontSize:11,fontWeight:600,padding:"5px 18px",borderRadius:20}}>First 45 days free</div>
+              <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:c.green,color:"#fff",fontSize:11,fontWeight:600,padding:"5px 18px",borderRadius:20}}>First 14 days free</div>
               <div style={{fontSize:15,fontWeight:700,marginTop:8,marginBottom:4}}>Pro</div>
               <div style={{fontSize:13,color:c.sub,marginBottom:16}}>For solo agents</div>
               <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:2}}>
                 <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$75</span>
                 <span style={{fontSize:14,color:c.sub}}>/month</span>
               </div>
-              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 45 days</div>
+              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 14 days</div>
               <div style={{fontSize:12,color:c.dim,marginBottom:20}}>+ $125 one-time setup fee</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
-                {["Everything in the app","AI Copilot","SMS Messaging","Smart Calendar","Marketing ROI","Lead Capture Link","Mobile App","Unlimited leads & deals"].map((f,i)=>(
+                {["Everything in the app","AI Copilot drafts","Voice-to-CRM","Smart Calendar","Marketing ROI","Lead Capture Link","Web + mobile (PWA)","Unlimited leads & deals"].map((f,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:4,height:4,borderRadius:"50%",background:c.text}}/><span style={{fontSize:13,color:c.sub}}>{f}</span></div>
                 ))}
               </div>
@@ -349,14 +392,14 @@ export default function Home(){
                 <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$200</span>
                 <span style={{fontSize:14,color:c.sub}}>/month</span>
               </div>
-              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 45 days</div>
+              <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 14 days</div>
               <div style={{fontSize:12,color:c.dim,marginBottom:20}}>+ $125 one-time setup fee</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
                 {["Everything in Pro","Up to 5 agent seats","Team code for member onboarding","Shared subscription","Priority support"].map((f,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:4,height:4,borderRadius:"50%",background:c.dim}}/><span style={{fontSize:13,color:c.sub}}>{f}</span></div>
                 ))}
               </div>
-              <a href="/login" style={{display:"block",background:c.bg,border:`1px solid ${c.border}`,borderRadius:8,padding:"13px 0",fontSize:14,fontWeight:600,color:c.sub,textDecoration:"none",textAlign:"center"}}>Start 45-day trial</a>
+              <a href="/login" style={{display:"block",background:c.bg,border:`1px solid ${c.border}`,borderRadius:8,padding:"13px 0",fontSize:14,fontWeight:600,color:c.sub,textDecoration:"none",textAlign:"center"}}>Start 14-day trial</a>
             </div>
 
             {/* Agency */}
@@ -400,14 +443,14 @@ export default function Home(){
       <section style={{padding:"60px 20px",textAlign:"center",borderTop:`1px solid ${c.border}`}}>
         <div style={{maxWidth:520,margin:"0 auto"}}>
           <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
-            <span style={{fontSize:12,fontWeight:600,color:c.green}}>Limited — first 45 days free</span>
+            <span style={{fontSize:12,fontWeight:600,color:c.green}}>Limited — first 14 days free</span>
           </div>
           <h2 style={{fontSize:32,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 12px"}}>Your leads are waiting.</h2>
-          <p style={{fontSize:15,color:c.sub,marginBottom:28}}>45 days free. No credit card. Everything included.</p>
+          <p style={{fontSize:15,color:c.sub,marginBottom:28}}>14 days free. No credit card. Everything included.</p>
           <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
             {!submitted?<>
               <input type="email" placeholder="Your email" value={email} onChange={e=>setEmail(e.target.value)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"14px 18px",fontSize:14,color:c.text,width:"100%",maxWidth:240,minWidth:180,outline:"none",fontFamily:"inherit",flex:"1 1 180px"}}/>
-              <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 45 Days Free</button>
+              <button onClick={handleSubmit} style={{background:c.text,border:"none",borderRadius:8,padding:"14px 28px",fontSize:14,fontWeight:600,color:c.white,cursor:"pointer"}}>Get 14 Days Free</button>
             </>:<div style={{background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:8,padding:"14px 28px",fontSize:14,color:c.green,fontWeight:600}}>You're in. Check your email.</div>}
           </div>
         </div>
@@ -427,44 +470,4 @@ export default function Home(){
       <footer style={{borderTop:`1px solid ${c.border}`,padding:"24px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",maxWidth:1120,margin:"0 auto",flexWrap:"wrap",gap:8}}>
         <span style={{fontSize:14,fontWeight:700}}>Brikk</span>
         <div style={{display:"flex",gap:20}}>
-          <a href="/login" style={{fontSize:12,color:c.sub}}>Sign In</a>
-          <a href="/demo" style={{fontSize:12,color:c.sub}}>Full Demo</a>
-          <a href="/refer" style={{fontSize:12,color:c.sub}}>Referral Form</a>
-          <a href="/privacy" style={{fontSize:12,color:c.sub}}>Privacy</a>
-          <a href="/terms" style={{fontSize:12,color:c.sub}}>Terms</a>
-        </div>
-      </footer>
-
-      {/* AI Help Chat Widget */}
-      {!chatOpen&&<div style={{position:"fixed",bottom:24,right:24,zIndex:100,display:"flex",alignItems:"center",gap:10}}>
-        <div onClick={()=>setChatOpen(true)} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:20,padding:"8px 16px",boxShadow:"0 2px 12px rgba(0,0,0,0.08)",cursor:"pointer",animation:"slideUp 0.4s ease-out 1s both"}}>
-          <span style={{fontSize:12,fontWeight:600,color:c.text}}>Ask AI about Brikk</span>
-        </div>
-        <button onClick={()=>setChatOpen(true)} style={{width:56,height:56,borderRadius:"50%",background:c.text,border:"none",boxShadow:"0 4px 20px rgba(0,0,0,0.15)",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        </button>
-      </div>}
-
-      {chatOpen&&<div className="scale-in" style={{position:"fixed",bottom:24,right:24,width:360,maxWidth:"calc(100vw - 32px)",height:480,maxHeight:"calc(100vh - 48px)",background:c.white,border:`1px solid ${c.border}`,borderRadius:16,boxShadow:"0 8px 40px rgba(0,0,0,0.12)",display:"flex",flexDirection:"column",zIndex:100,overflow:"hidden"}}>
-        <div style={{padding:"16px 20px",borderBottom:`1px solid ${c.border}`,display:"flex",justifyContent:"space-between",alignItems:"center",flexShrink:0}}>
-          <div><div style={{fontSize:14,fontWeight:700}}>Ask Brikk</div><div style={{fontSize:11,color:c.dim}}>AI-powered answers</div></div>
-          <button onClick={()=>setChatOpen(false)} style={{background:"none",border:"none",fontSize:18,color:c.dim,cursor:"pointer",padding:"4px"}}>×</button>
-        </div>
-        <div style={{flex:1,overflow:"auto",padding:"16px 20px",display:"flex",flexDirection:"column",gap:12}}>
-          {chatHistory.map((m,i)=>(
-            <div key={i} style={{display:"flex",justifyContent:m.role==='user'?"flex-end":"flex-start"}}>
-              <div style={{maxWidth:"85%",padding:"10px 14px",borderRadius:m.role==='user'?"12px 12px 2px 12px":"12px 12px 12px 2px",background:m.role==='user'?c.text:c.bg,color:m.role==='user'?"#fff":c.text,fontSize:13,lineHeight:1.6}}>{m.content}</div>
-            </div>
-          ))}
-          {chatLoading&&<div style={{display:"flex",justifyContent:"flex-start"}}><div style={{padding:"10px 14px",borderRadius:"12px 12px 12px 2px",background:c.bg,fontSize:13,color:c.dim,animation:"pulse 1.2s ease-in-out infinite"}}>Thinking...</div></div>}
-        </div>
-        <div style={{padding:"12px 16px",borderTop:`1px solid ${c.border}`,display:"flex",gap:8,flexShrink:0}}>
-          <input value={chatMsg} onChange={e=>setChatMsg(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')handleChat()}} placeholder="Ask anything about Brikk..."
-            style={{flex:1,padding:"10px 14px",borderRadius:8,border:`1px solid ${c.border}`,fontSize:14,color:c.text,background:c.bg,outline:"none",fontFamily:"inherit"}}/>
-          <button onClick={handleChat} disabled={!chatMsg.trim()||chatLoading}
-            style={{background:c.text,border:"none",borderRadius:8,padding:"10px 16px",fontSize:13,fontWeight:600,color:"#fff",cursor:"pointer",fontFamily:"inherit",opacity:chatMsg.trim()&&!chatLoading?1:0.5}}>Send</button>
-        </div>
-      </div>}
-    </div>
-  )
-}
+          <a href="/login" style={{fontSize:12,color:c.sub}}>

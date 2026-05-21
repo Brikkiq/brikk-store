@@ -6,6 +6,7 @@ import { c } from '@/lib/design'
 import { Logo } from '@/lib/Logo'
 import { ensureReferralCode } from '@/lib/referralCode'
 import { VoiceButton } from '@/lib/Voice'
+import { getTrialState, shouldGate } from '@/lib/trial'
 
 const navItems = [
   { label: 'Today',         href: '/app',           key: 'home' },
@@ -68,6 +69,7 @@ const Icon = ({ name, size = 18 }) => {
 export default function AppLayout({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [team, setTeam] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentPath, setCurrentPath] = useState('/app')
   const [banner, setBanner] = useState(null)
@@ -88,12 +90,36 @@ export default function AppLayout({ children }) {
       const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
       if (cancelled) return
       setProfile(prof || null)
+
+      // Fetch team if user belongs to one — needed for trial-state resolution
+      let teamData = null
+      if (prof?.team_id) {
+        const { data: t } = await supabase.from('teams').select('*').eq('id', prof.team_id).maybeSingle()
+        teamData = t || null
+        setTeam(teamData)
+      }
+
+      // Trial gate — redirect to /app/upgrade when trial has expired and no paid plan.
+      // The upgrade page itself, plus settings billing tab + auth callbacks, stay reachable.
+      const trial = getTrialState({ profile: prof, team: teamData })
+      const path = typeof window !== 'undefined' ? window.location.pathname : ''
+      const isExempt =
+        path.startsWith('/app/upgrade') ||
+        path.startsWith('/app/settings')  // settings exempt so user can subscribe / sign out
+      if (shouldGate(trial.state) && !isExempt) {
+        window.location.href = '/app/upgrade'
+        return
+      }
+
       setLoading(false)
       // Make sure this user has a referral code. Cheap if they already do.
       ensureReferralCode(user.id).catch(err => console.warn('referral code ensure failed', err?.message))
       checkBanner(user.id).catch(err => console.warn('banner check failed', err?.message))
 
       // If they signed up with a pending team code, redeem it now.
+      // We always clear the localStorage key after a single attempt — even on
+      // failure — so an invalid code doesn't keep retrying on every login.
+      // If the user wants to try again with a fresh code, they can use Settings → Team.
       try {
         const pending = typeof window !== 'undefined'
           ? localStorage.getItem('brikk-pending-team-code')
@@ -101,16 +127,20 @@ export default function AppLayout({ children }) {
         if (pending) {
           const session = (await supabase.auth.getSession()).data.session
           if (session?.access_token) {
-            fetch('/api/team', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${session.access_token}`,
-              },
-              body: JSON.stringify({ action: 'join', team_code: pending }),
-            }).then(() => {
+            try {
+              await fetch('/api/team', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ action: 'join', team_code: pending }),
+              })
+            } catch (err) {
+              console.warn('Pending team join failed', err?.message)
+            } finally {
               localStorage.removeItem('brikk-pending-team-code')
-            }).catch(() => {})
+            }
           }
         }
       } catch {}
@@ -244,6 +274,17 @@ export default function AppLayout({ children }) {
   const firstName = profile?.full_name ? profile.full_name.split(' ')[0] : (user?.email || '').split('@')[0]
   const bannerColor = banner?.tone === 'urgent' ? c.red : banner?.tone === 'warn' ? c.amber : c.indigo
   const bannerBg = banner?.tone === 'urgent' ? c.redSoft : banner?.tone === 'warn' ? c.amberSoft : c.indigoSoft
+
+  // Trial banner — separate from the activity banner. Persistent (not dismissable)
+  // when the trial is winding down or payment failed.
+  const trial = getTrialState({ profile, team })
+  const showTrialBanner = trial.state === 'trialing' || trial.state === 'past_due'
+  const trialTone = trial.state === 'past_due' ? c.red
+                  : trial.daysLeft !== null && trial.daysLeft <= 3 ? c.amber
+                  : c.indigo
+  const trialBg = trial.state === 'past_due' ? c.redSoft
+                : trial.daysLeft !== null && trial.daysLeft <= 3 ? c.amberSoft
+                : c.indigoSoft
 
   return (
     <div
@@ -432,6 +473,28 @@ export default function AppLayout({ children }) {
               opacity: refreshing ? 1 : Math.min(pullDistance / 50, 1),
               transform: `rotate(${pullDistance * 4}deg)`,
             }} />
+          </div>
+        )}
+
+        {/* Trial / subscription banner — persistent, no dismiss */}
+        {showTrialBanner && (
+          <div style={{
+            background: trialBg,
+            borderBottom: `1px solid ${trialTone}33`,
+            padding: '10px 24px',
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 12,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: trialTone, flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 500, color: c.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {trial.message}
+              </span>
+            </div>
+            <a
+              href="/app/settings?tab=billing"
+              style={{ fontSize: 12, fontWeight: 600, color: trialTone, textDecoration: 'none', flexShrink: 0 }}
+            >Subscribe →</a>
           </div>
         )}
 

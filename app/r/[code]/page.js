@@ -189,6 +189,19 @@ export default function ReferralCodePage() {
           <button onClick={handleSubmit} style={{ ...btn.primary, width: '100%', height: 40 }}>
             Send
           </button>
+
+          {/* TCPA + privacy disclosure */}
+          <div style={{ marginTop: 16, padding: '12px 14px', background: c.bgInset, borderRadius: 6, border: `1px solid ${c.borderLight}` }}>
+            <p style={{ fontSize: 11, color: c.dim, lineHeight: 1.6, margin: 0 }}>
+              By submitting this form, you consent to be contacted by {agent.full_name || 'your agent'}
+              {agent.brokerage ? ` at ${agent.brokerage}` : ''} by phone, text, or email about real estate
+              services. Standard messaging rates may apply. Consent is not a condition of purchase. Reply
+              STOP to any text to opt out. See our{' '}
+              <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: c.sub, textDecoration: 'underline' }}>Privacy Policy</a>{' '}
+              and{' '}
+              <a href="/terms" target="_blank" rel="noreferrer" style={{ color: c.sub, textDecoration: 'underline' }}>Terms</a>.
+            </p>
+          </div>
         </div>
 
         <div style={{ textAlign: 'center', marginTop: 20 }}>
