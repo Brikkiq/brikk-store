@@ -160,22 +160,41 @@ export default function Home(){
     setSubmitted(true)
   }
 
-  // Fix anchor links that don't trigger scroll on direct URL load or while
-  // already on the homepage. Listens for hash changes + scrolls on first load
-  // if a hash is present.
+  // Smooth-scroll to an in-page section. Used by the nav links and by direct
+  // URL loads with a #hash. Respects each section's scroll-margin-top so the
+  // sticky-feeling nav doesn't obscure the heading.
+  const scrollToSection = (hash) => {
+    if (typeof window === 'undefined' || !hash) return
+    const el = document.querySelector(hash)
+    if (!el) return
+    // Use scrollIntoView with smooth; scroll-margin-top on the section handles
+    // the offset for any nav overhead.
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // Handle direct URL load with #hash. Wait for layout to settle.
   useEffect(()=>{
     if(typeof window==='undefined') return
     const scrollToHash=()=>{
       const hash=window.location.hash
-      if(!hash) return
-      const el=document.querySelector(hash)
-      if(el) el.scrollIntoView({behavior:'smooth',block:'start'})
+      if(hash) scrollToSection(hash)
     }
-    // Defer to next tick so layout is settled
-    setTimeout(scrollToHash, 50)
+    const t = setTimeout(scrollToHash, 80)
     window.addEventListener('hashchange', scrollToHash)
-    return ()=>window.removeEventListener('hashchange', scrollToHash)
+    return ()=>{ clearTimeout(t); window.removeEventListener('hashchange', scrollToHash) }
   },[])
+
+  // Used as onClick for nav anchor links to override the browser's default
+  // jump-to-anchor and use our smooth-scroll instead, which lands at the
+  // correct y-offset.
+  const navLinkClick = (e, hash) => {
+    e.preventDefault()
+    if (typeof window !== 'undefined') {
+      // Update URL without triggering browser jump; useEffect handler not needed since we scroll directly.
+      window.history.replaceState(null, '', hash)
+    }
+    scrollToSection(hash)
+  }
 
   const handleChat=async()=>{
     if(!chatMsg.trim()||chatLoading)return
@@ -214,9 +233,9 @@ export default function Home(){
       <nav style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px",maxWidth:1120,margin:"0 auto"}}>
         <a href="/" style={{textDecoration:"none"}}><Logo size={18}/></a>
         <div style={{display:"flex",alignItems:"center",gap:20}}>
-          <a href="#features" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
-          <a href="#how" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Get started</a>
-          <a href="#pricing" className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Pricing</a>
+          <a href="#features" onClick={(e)=>navLinkClick(e,'#features')} className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
+          <a href="#how" onClick={(e)=>navLinkClick(e,'#how')} className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Get started</a>
+          <a href="#pricing" onClick={(e)=>navLinkClick(e,'#pricing')} className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Pricing</a>
           <a href="/login" style={{fontSize:13,fontWeight:600,color:c.bg,background:c.text,padding:"8px 20px",borderRadius:6}}>Start Free</a>
         </div>
       </nav>
@@ -301,7 +320,7 @@ export default function Home(){
       </section>
 
       {/* How it works */}
-      <section id="how" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,background:c.white}}>
+      <section id="how" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,background:c.white,scrollMarginTop:80}}>
         <div style={{maxWidth:1120,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:48}}>
             <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:0}}>Set up in 5 minutes. Not 5 hours.</h2>
@@ -323,7 +342,7 @@ export default function Home(){
       </section>
 
       {/* Features — only what's real */}
-      <section id="features" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`}}>
+      <section id="features" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,scrollMarginTop:80}}>
         <div style={{maxWidth:1120,margin:"0 auto"}}>
           <div style={{marginBottom:48}}>
             <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>What you get today.</h2>
@@ -359,12 +378,13 @@ export default function Home(){
       </section>
 
       {/* Pricing */}
-      <section id="pricing" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`}}>
+      <section id="pricing" style={{padding:"48px 20px 60px",borderTop:`1px solid ${c.border}`,scrollMarginTop:80}}>
         <div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
           <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>Simple pricing. No surprises.</h2>
-          <p style={{fontSize:15,color:c.sub,marginBottom:32}}>Start free. Cancel anytime. No contracts.</p>
-
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:14}}>
+          <p style={{fontSize:15,color:c.sub,marginBottom:24}}>Start free. Cancel anytime. No contracts.</p>
+        </div>
+        <div style={{maxWidth:1020,margin:"0 auto",textAlign:"center"}}>
+          <div className="pricing-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:14,textAlign:"left"}}>
             {/* Pro */}
             <div style={{background:c.white,border:`2px solid ${c.text}`,borderRadius:12,padding:"32px 28px",position:"relative"}}>
               <div style={{position:"absolute",top:-12,left:"50%",transform:"translateX(-50%)",background:c.green,color:"#fff",fontSize:11,fontWeight:600,padding:"5px 18px",borderRadius:20}}>First 14 days free</div>

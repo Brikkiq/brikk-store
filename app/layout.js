@@ -26,8 +26,10 @@ export const metadata = {
     telephone: false,
   },
   icons: {
-    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
-    apple: [{ url: '/icon-180.png' }],
+    // Cache-bust with ?v=2 so devices that already cached the old "B"
+    // placeholder pick up the new two-brick mark.
+    icon: [{ url: '/favicon.svg?v=2', type: 'image/svg+xml' }],
+    apple: [{ url: '/icon-180.png?v=2' }],
   },
 }
 
