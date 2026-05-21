@@ -49,7 +49,7 @@ async function draftMessage(lead, agentName) {
   }
 }
 
-function buildBriefingHtml({ firstName, dateLabel, hotLeads, closingsSoon, drafts }) {
+function buildBriefingHtml({ firstName, dateLabel, hotLeads, closingsSoon, drafts, birthdaysToday = [] }) {
   const block = (rows) => rows.map(r => `
     <tr><td style="padding:10px 0;border-bottom:1px solid #F0F0EC;">
       <div style="font-size:14px;font-weight:500;color:#1A1A18;">${r.title}</div>
@@ -88,8 +88,14 @@ function buildBriefingHtml({ firstName, dateLabel, hotLeads, closingsSoon, draft
       </td></tr>
       <tr><td style="padding:4px 28px 8px 28px;">
         <h1 style="font-size:22px;font-weight:600;letter-spacing:-0.015em;margin:0 0 4px 0;color:#1A1A18;">Good morning${firstName ? ', ' + firstName : ''}.</h1>
-        <p style="font-size:14px;line-height:1.65;color:#6B6B66;margin:0 0 18px 0;">${hotLeads.length + closingsSoon.length + drafts.length === 0 ? "You're all caught up. Nothing urgent today." : `${hotLeads.length} hot lead${hotLeads.length === 1 ? '' : 's'} need attention · ${closingsSoon.length} closing${closingsSoon.length === 1 ? '' : 's'} this week · ${drafts.length} draft${drafts.length === 1 ? '' : 's'} ready.`}</p>
+        <p style="font-size:14px;line-height:1.65;color:#6B6B66;margin:0 0 18px 0;">${hotLeads.length + closingsSoon.length + drafts.length + birthdaysToday.length === 0 ? "You're all caught up. Nothing urgent today." : `${hotLeads.length} hot lead${hotLeads.length === 1 ? '' : 's'} need attention · ${closingsSoon.length} closing${closingsSoon.length === 1 ? '' : 's'} this week · ${drafts.length} draft${drafts.length === 1 ? '' : 's'} ready${birthdaysToday.length ? ' · ' + birthdaysToday.length + ' birthday' + (birthdaysToday.length === 1 ? '' : 's') + ' today' : ''}.`}</p>
       </td></tr>
+
+      ${birthdaysToday.length > 0 ? `
+      <tr><td style="padding:0 28px;">
+        <h2 style="font-size:13px;font-weight:600;color:#9C9C96;text-transform:uppercase;letter-spacing:0.06em;margin:0 0 4px 0;">Birthdays today</h2>
+        <table cellspacing="0" cellpadding="0" border="0" width="100%">${block(birthdaysToday)}</table>
+      </td></tr>` : ''}
 
       ${hotLeads.length > 0 ? `
       <tr><td style="padding:0 28px;">
@@ -199,6 +205,30 @@ export async function GET(request) {
         cta: '',
       }))
 
+    // Today's birthdays — high-touch, low-effort, high-ROI. Strong relationship glue.
+    const birthdaysToday = (leads || [])
+      .filter(l => {
+        if (!l.birthday) return false
+        const b = new Date(l.birthday)
+        return b.getMonth() === today.getMonth() && b.getDate() === today.getDate()
+      })
+      .slice(0, 5)
+      .map(l => {
+        const bday = new Date(l.birthday)
+        const turning = today.getFullYear() - bday.getFullYear()
+        const phone = l.phone ? String(l.phone).replace(/[^0-9+]/g, '') : null
+        const firstName = (l.name || '').split(' ')[0] || 'there'
+        const draftText = `Happy birthday, ${firstName}! Hope you have a great day.`
+        const smsUrl = phone ? `sms:${phone}?body=${encodeURIComponent(draftText)}` : null
+        return {
+          title: `🎂 ${l.name} turns ${turning} today`,
+          subtitle: l.lead_type ? `${l.lead_type} · ${l.temperature || 'lead'}` : (l.temperature || 'lead'),
+          cta: smsUrl
+            ? `<a href="${smsUrl}" style="color:#16803C;text-decoration:none;font-size:12.5px;font-weight:500;">Send birthday wish ↗</a>`
+            : '',
+        }
+      })
+
     // Generate up to 3 AI drafts for follow-ups
     const draftCandidates = (leads || [])
       .filter(l => {
@@ -233,12 +263,12 @@ export async function GET(request) {
     }
 
     // Skip the email entirely if there's nothing to say
-    if (hotLeads.length === 0 && closingsSoon.length === 0 && drafts.length === 0) {
+    if (hotLeads.length === 0 && closingsSoon.length === 0 && drafts.length === 0 && birthdaysToday.length === 0) {
       skipped++
       continue
     }
 
-    const html = buildBriefingHtml({ firstName, dateLabel, hotLeads, closingsSoon, drafts })
+    const html = buildBriefingHtml({ firstName, dateLabel, hotLeads, closingsSoon, drafts, birthdaysToday })
 
     const result = await sendEmail({
       fromName: 'Brikk',

@@ -39,14 +39,19 @@ export default function SettingsPage() {
     setTimeout(() => setToast(null), 4500)
   }
 
-  // Handle ?payment=success / ?payment=cancelled returns from Stripe Checkout.
-  // success_url and cancel_url in /api/stripe/route.js both point here. We
-  // surface a banner to the user and clean up the URL so refreshes don't re-show
-  // the message.
+  // Handle ?payment=success / ?payment=cancelled returns from Stripe Checkout,
+  // and ?tab= deep links so bookmarks/shared URLs land on the right tab.
   useEffect(() => {
     if (typeof window === 'undefined') return
     const params = new URLSearchParams(window.location.search)
     const payment = params.get('payment')
+    const tab = params.get('tab')
+
+    // Deep-link to a specific tab if requested (and it's a valid one).
+    if (tab && TABS.some(t => t.id === tab)) {
+      setActiveTab(tab)
+    }
+
     if (payment === 'success') {
       setActiveTab('billing')
       showToast('🎉 Subscription started. You\'re in your 14-day trial — card on file, no charge until trial ends.', 'success')
@@ -59,10 +64,22 @@ export default function SettingsPage() {
     }
     if (payment || params.get('from')) {
       // Strip the query string so a refresh doesn't re-trigger.
+      // Keep ?tab= since that's intentional state.
       const cleanUrl = window.location.pathname + window.location.hash
       window.history.replaceState({}, '', cleanUrl)
     }
   }, [])
+
+  // Keep the URL in sync with the active tab so bookmarks + shares preserve state.
+  const switchTab = (tabId) => {
+    setActiveTab(tabId)
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      params.set('tab', tabId)
+      const newUrl = `${window.location.pathname}?${params.toString()}${window.location.hash}`
+      window.history.replaceState({}, '', newUrl)
+    }
+  }
 
   useEffect(() => {
     loadProfile()
@@ -278,7 +295,7 @@ export default function SettingsPage() {
         {TABS.map(t => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id)}
+            onClick={() => switchTab(t.id)}
             style={{
               flexShrink: 0,
               scrollSnapAlign: 'start',
@@ -303,7 +320,7 @@ export default function SettingsPage() {
           {TABS.map(t => (
             <button
               key={t.id}
-              onClick={() => setActiveTab(t.id)}
+              onClick={() => switchTab(t.id)}
               style={{
                 background: activeTab === t.id ? c.white : 'transparent',
                 border: `1px solid ${activeTab === t.id ? c.border : 'transparent'}`,

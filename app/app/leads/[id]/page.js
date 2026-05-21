@@ -43,21 +43,36 @@ export default function LeadDetailPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     // Every query scoped by user_id as defense-in-depth alongside RLS.
-    const [leadRes, msgsRes, intsRes, dealsRes] = await Promise.all([
+    // Deals now query by lead_id (proper foreign key) AND fall back to
+    // client_name match for legacy deals created before the link existed.
+    const [leadRes, msgsRes, intsRes, dealsByLinkRes, dealsAllRes] = await Promise.all([
       supabase.from('leads').select('*').eq('id', leadId).eq('user_id', user.id).single(),
       supabase.from('messages').select('*').eq('lead_id', leadId).eq('user_id', user.id).order('created_at', { ascending: true }),
       supabase.from('interactions').select('*').eq('lead_id', leadId).eq('user_id', user.id).order('created_at', { ascending: false }).limit(50),
-      supabase.from('deals').select('*').eq('user_id', user.id),
+      // Primary: deals explicitly linked to this lead.
+      supabase.from('deals').select('*').eq('user_id', user.id).eq('lead_id', leadId),
+      // Fallback: name-match for any legacy un-linked deals.
+      supabase.from('deals').select('*').eq('user_id', user.id).is('lead_id', null),
     ])
     if (leadRes.error) console.error('Load lead failed:', leadRes.error.message)
     const l = leadRes.data
     setLead(l)
     setMessages(msgsRes.data || [])
     setInteractions(intsRes.data || [])
-    // Attached deals — heuristic: any deal whose client_name matches the lead's name
     if (l) {
-      const matchName = (l.name || '').toLowerCase()
-      setDeals((dealsRes.data || []).filter(d => (d.client_name || '').toLowerCase() === matchName))
+      const linkedDeals = dealsByLinkRes.data || []
+      const matchName = (l.name || '').toLowerCase().trim()
+      // Add legacy unlinked deals whose client_name matches, so nothing is lost
+      // until the agent links them manually via the deal edit form.
+      const fallbackDeals = (dealsAllRes.data || []).filter(d =>
+        matchName && (d.client_name || '').toLowerCase().trim() === matchName
+      )
+      // De-dupe by id (shouldn't overlap, but defensive).
+      const allDeals = [...linkedDeals]
+      for (const d of fallbackDeals) {
+        if (!allDeals.find(x => x.id === d.id)) allDeals.push(d)
+      }
+      setDeals(allDeals)
     }
     setLoading(false)
   }

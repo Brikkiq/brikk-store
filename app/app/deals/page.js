@@ -10,10 +10,12 @@ const stageProgress = { Contract: 10, Inspection: 25, Appraisal: 40, Financing: 
 const emptyForm = {
   address: '', client_name: '', price: '', commission: '',
   close_date: '', stage: 'Contract', notes: '',
+  lead_id: '',
 }
 
 export default function DealsPage() {
   const [deals, setDeals] = useState([])
+  const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -26,7 +28,7 @@ export default function DealsPage() {
     setTimeout(() => setToast(null), 3000)
   }
 
-  useEffect(() => { loadDeals() }, [])
+  useEffect(() => { loadDeals(); loadLeads() }, [])
 
   const loadDeals = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -40,6 +42,19 @@ export default function DealsPage() {
     setLoading(false)
   }
 
+  // Load the agent's leads so the deal form can offer a "Linked lead" dropdown.
+  // Lightweight — only the fields the dropdown needs.
+  const loadLeads = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('leads')
+      .select('id, name, lead_type, temperature, phone, email')
+      .eq('user_id', user.id)
+      .order('name', { ascending: true })
+    setLeads(data || [])
+  }
+
   const handleSave = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -49,6 +64,7 @@ export default function DealsPage() {
       price: parseFloat(form.price) || 0,
       commission: parseFloat(form.commission) || 0,
       progress: stageProgress[form.stage] || 0,
+      lead_id: form.lead_id || null,
       user_id: user.id,
     }
     try {
@@ -79,6 +95,7 @@ export default function DealsPage() {
       price: deal.price?.toString() || '', commission: deal.commission?.toString() || '',
       close_date: deal.close_date || '', stage: deal.stage || 'Contract',
       notes: deal.notes || '',
+      lead_id: deal.lead_id || '',
     })
     setEditId(deal.id)
     setShowForm(true)
@@ -125,6 +142,7 @@ export default function DealsPage() {
         <DealForm
           form={form} setForm={setForm}
           editId={editId} saving={saving}
+          leads={leads}
           onSave={handleSave}
           onCancel={() => { setShowForm(false); setEditId(null) }}
         />
@@ -321,12 +339,48 @@ const Stepper = ({ current, onSelect }) => {
   )
 }
 
-const DealForm = ({ form, setForm, editId, saving, onSave, onCancel }) => (
+const DealForm = ({ form, setForm, editId, saving, leads = [], onSave, onCancel }) => {
+  // When a lead is selected, auto-fill client_name from the chosen lead.
+  // Agent can still edit the field afterward if they want a different label.
+  const handleLeadLink = (leadId) => {
+    if (!leadId) {
+      setForm({ ...form, lead_id: '' })
+      return
+    }
+    const linkedLead = leads.find(l => l.id === leadId)
+    setForm({
+      ...form,
+      lead_id: leadId,
+      client_name: linkedLead?.name || form.client_name,
+    })
+  }
+  return (
   <div style={{ ...card, marginBottom: 16 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
       <div style={type.sectionTitle}>{editId ? 'Edit deal' : 'New deal'}</div>
       <button onClick={onCancel} style={{ background: 'none', border: 'none', fontSize: 18, color: c.dim, cursor: 'pointer' }}>×</button>
     </div>
+
+    {/* Lead linker — pick an existing lead to auto-fill client info and keep
+        them in sync. Selecting a lead pre-populates the client name; future
+        edits to the lead's name flow back into this deal via DB trigger. */}
+    {leads.length > 0 && (
+      <div style={{ marginBottom: 14 }}>
+        <label style={inputLabel}>Linked lead {form.lead_id ? '(auto-syncs name)' : '(optional)'}</label>
+        <select
+          value={form.lead_id || ''}
+          onChange={e => handleLeadLink(e.target.value)}
+          style={input}
+        >
+          <option value="">— No linked lead —</option>
+          {leads.map(l => (
+            <option key={l.id} value={l.id}>
+              {l.name}{l.lead_type ? ` · ${l.lead_type}` : ''}{l.temperature ? ` · ${l.temperature}` : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+    )}
 
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 14 }}>
       <Field label="Property address *">
@@ -373,7 +427,8 @@ const DealForm = ({ form, setForm, editId, saving, onSave, onCancel }) => (
       <button onClick={onCancel} style={btn.secondary}>Cancel</button>
     </div>
   </div>
-)
+  )
+}
 
 const Field = ({ label, children }) => (
   <div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { c, type, card, statTile, btn, chipFor, fmt } from '@/lib/design'
+import { findUpcomingBirthdays, birthdayLabel, birthdayMessageDraft } from '@/lib/birthdays'
 
 export default function AppOverview() {
   const [leads, setLeads] = useState([])
@@ -128,6 +129,29 @@ export default function AppOverview() {
     })
   }
 
+  // Birthday alerts — surface today + next 7 days as action cards.
+  // Touching a client's birthday is one of the highest-ROI moments an agent
+  // can engineer; missing it is the most damaging.
+  const upcomingBirthdays = findUpcomingBirthdays(leads, 7)
+  upcomingBirthdays.forEach(l => {
+    const label = birthdayLabel(l)
+    const draftMsg = encodeURIComponent(birthdayMessageDraft(l.name, l.isToday))
+    const phoneClean = l.phone ? String(l.phone).replace(/[^0-9+]/g, '') : null
+    actions.push({
+      id: `birthday-${l.id}`,
+      priority: l.isToday ? 'high' : l.daysUntil <= 2 ? 'medium' : 'low',
+      category: 'Birthday',
+      title: `🎂 ${l.name}`,
+      subtitle: label,
+      meta: l.lead_type ? `${l.lead_type} · ${l.temperature || 'lead'}` : (l.temperature || 'lead'),
+      tone: l.isToday ? 'celebrate' : 'info',
+      primaryLabel: phoneClean ? 'Text birthday wish' : null,
+      primaryHref: phoneClean ? `sms:${phoneClean}?&body=${draftMsg}` : null,
+      secondaryHref: `/app/leads/${l.id}`,
+      secondaryLabel: 'Open lead',
+    })
+  })
+
   const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
   actions.sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3))
   const pending = actions.filter(a => !dismissedActions.includes(a.id))
@@ -236,8 +260,13 @@ const ActionRow = ({ action, onDismiss }) => {
         {action.meta && <div style={{ ...type.meta, marginTop: 4 }}>{action.meta}</div>}
       </div>
       <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-        {action.primaryFn && (
+        {action.primaryFn && action.primaryLabel && (
           <button onClick={action.primaryFn} style={btn.primary}>{action.primaryLabel}</button>
+        )}
+        {action.primaryHref && action.primaryLabel && (
+          <a href={action.primaryHref} style={{ ...btn.primary, textDecoration: 'none' }}>
+            {action.primaryLabel}
+          </a>
         )}
         {action.secondaryHref && (
           <a href={action.secondaryHref} style={{ ...btn.secondary, textDecoration: 'none' }}>

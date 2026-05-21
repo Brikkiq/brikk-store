@@ -42,8 +42,19 @@ export default function ReferralCodePage() {
   }, [code])
 
   const handleSubmit = async () => {
-    if (!form.name || !form.phone) {
-      setError('Please enter your name and phone number.')
+    // Build a specific message per missing field so users know exactly what's wrong.
+    const missing = []
+    if (!form.name.trim())  missing.push('your name')
+    if (!form.phone.trim()) missing.push('your phone number')
+    if (missing.length) {
+      const joined = missing.length === 2 ? `${missing[0]} and ${missing[1]}` : missing[0]
+      setError(`Please enter ${joined}.`)
+      return
+    }
+    // Email is optional, but if provided, must be a valid format. Otherwise the
+    // agent ends up with a broken mailto: link in their CRM.
+    if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      setError('That email doesn\'t look right. Double-check it or leave it blank.')
       return
     }
     setError(null)
@@ -155,7 +166,8 @@ export default function ReferralCodePage() {
                 <button
                   key={t}
                   type="button"
-                  onClick={() => setForm({ ...form, type: t })}
+                  aria-pressed={form.type === t}
+                  onClick={() => setForm(prev => ({ ...prev, type: t }))}
                   style={{
                     flex: 1, height: 36, borderRadius: 6,
                     border: `1px solid ${form.type === t ? c.text : c.border}`,

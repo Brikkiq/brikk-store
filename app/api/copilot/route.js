@@ -324,7 +324,12 @@ Tone: warm, concise, honest. 2-3 sentences max unless they ask for detail. If un
 
     const drafts = []
 
-    for (const lead of leads.slice(0, 5)) {
+    // Cap at 20 to keep one request from running too long or burning too many
+    // tokens. If more leads need follow-ups, the UI surfaces a "x more leads
+    // pending — generate again" message based on the returned `truncated` flag.
+    const MAX_DRAFTS_PER_CALL = 20
+    const truncated = leads.length > MAX_DRAFTS_PER_CALL
+    for (const lead of leads.slice(0, MAX_DRAFTS_PER_CALL)) {
       const daysSinceContact = lead.days_since_contact || 0
 
       let historyContext = ''
@@ -461,7 +466,12 @@ Respond with ONLY a valid JSON object. No markdown, no commentary.
       }
     }
 
-    return NextResponse.json({ drafts })
+    return NextResponse.json({
+      drafts,
+      truncated,
+      totalCandidates: leads.length,
+      generatedCount: drafts.length,
+    })
   } catch (error) {
     console.error('Copilot API error:', error)
     return NextResponse.json({ error: 'Failed to generate drafts' }, { status: 500 })

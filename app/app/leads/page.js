@@ -105,6 +105,13 @@ export default function LeadsPage() {
     })
     setEditId(lead.id)
     setShowForm(true)
+    // Scroll to the top of the page where the edit form renders, otherwise the
+    // user clicks Edit on a lead far down the list and sees no visible change.
+    if (typeof window !== 'undefined') {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      })
+    }
   }
 
   const handleDelete = async (id) => {
@@ -272,7 +279,7 @@ export default function LeadsPage() {
                           <Avatar name={l.name} temperature={l.temperature} />
                           <div>
                             <div style={{ fontWeight: 500, color: c.text }}>{l.name}</div>
-                            <div style={{ ...type.meta }}>{l.phone || l.email || '—'}</div>
+                            <div style={{ ...type.meta }}>{l.phone ? fmt.phone(l.phone) : (l.email || '—')}</div>
                           </div>
                         </a>
                       </td>
@@ -481,7 +488,7 @@ const LeadCard = ({ lead, onEdit, onDelete, onLog }) => {
           <div style={{ ...type.meta, marginTop: 2 }}>
             {[lead.lead_type, lead.source, lead.stage].filter(Boolean).join(' · ')}
           </div>
-          {lead.phone && <div style={{ ...type.meta, marginTop: 2 }}>{lead.phone}</div>}
+          {lead.phone && <div style={{ ...type.meta, marginTop: 2 }}>{fmt.phone(lead.phone)}</div>}
           {lead.price_range && <div style={{ ...type.meta, marginTop: 2 }}>{lead.price_range}</div>}
           <div style={{ marginTop: 4 }}>
             <ReadIndicator lead={lead} overdue={days != null && days >= 5} daysSince={days} />

@@ -18,6 +18,11 @@ export async function POST(request) {
     if (!name || !phone) {
       return NextResponse.json({ error: 'Name and phone required' }, { status: 400 })
     }
+    // Defense in depth: validate email server-side even if client form blocked it.
+    // Bots / curl can POST directly bypassing the React form.
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+      return NextResponse.json({ error: 'Invalid email format' }, { status: 400 })
+    }
     if (!agent_id && !referral_code) {
       return NextResponse.json({ error: 'Invalid referral link' }, { status: 400 })
     }

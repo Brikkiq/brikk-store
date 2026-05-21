@@ -69,6 +69,11 @@ export default function CopilotPage() {
       })
       const data = await res.json()
       setDrafts(data.drafts || [])
+      // Surface a clear message if more leads were eligible than we generated for.
+      if (data.truncated && data.totalCandidates > data.generatedCount) {
+        const remaining = data.totalCandidates - data.generatedCount
+        showToast(`Generated ${data.generatedCount} drafts. ${remaining} more leads need follow-up — approve some of these, then click Generate again for the next batch.`)
+      }
     } catch (err) {
       console.error('Generate failed:', err?.message)
       showToast('Could not generate drafts — please try again')
