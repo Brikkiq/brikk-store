@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { sendEmail } from '@/lib/email'
 
 // Stripe → Brikk webhook.
 // Verified by HMAC-SHA256 against STRIPE_WEBHOOK_SECRET.
@@ -276,15 +277,47 @@ export async function POST(request) {
     }
 
     // -------------------------------------------------- Trial ending in ~3 days
-    // Stripe fires this 3 days before a trial converts to paid. Good place to
-    // mark the profile so the morning brief / dashboard can show a heads-up,
-    // reducing surprise-charge chargebacks.
+    // Stripe fires this 3 days before a trial converts to paid. We do two things:
+    //   1. Mark the profile so the in-app banner can warn the user.
+    //   2. Send a "trial ends in 3 days" email so users aren't surprised.
+    // Both reduce post-trial chargebacks materially.
     if (event.type === 'customer.subscription.trial_will_end') {
       const subscription = event.data.object
       await supabase.from('profiles').update({
         subscription_status: 'trial_ending',
         updated_at: new Date().toISOString(),
       }).eq('stripe_subscription_id', subscription.id)
+
+      // Look up the user's email to send the heads-up.
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .eq('stripe_subscription_id', subscription.id)
+        .maybeSingle()
+
+      if (profile?.id) {
+        const { data: { user } } = await supabase.auth.admin.getUserById(profile.id)
+        if (user?.email) {
+          const plan = subscription.metadata?.plan || 'pro'
+          const priceLabel = plan === 'team' ? '$200/month' : '$75/month'
+          const trialEndDate = subscription.trial_end
+            ? new Date(subscription.trial_end * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+            : 'in 3 days'
+
+          await sendEmail({
+            fromName: 'Brikk',
+            to: user.email,
+            subject: 'Your Brikk trial ends in 3 days',
+            html: buildTrialEndingHtml({
+              firstName: (profile.full_name || '').split(' ')[0] || 'there',
+              plan: plan === 'team' ? 'Team' : 'Pro',
+              priceLabel,
+              trialEndDate,
+            }),
+            text: `Hi ${(profile.full_name || '').split(' ')[0] || 'there'},\n\nYour 14-day Brikk trial ends ${trialEndDate}. Your card will be charged ${priceLabel} on that date and your subscription will continue automatically.\n\nTo cancel before then, go to Settings → Billing → Open billing portal at https://brikk.store/app/settings.\n\nAll sales are final once charged — see https://brikk.store/terms.\n\nThanks,\nBrikk`,
+          })
+        }
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -320,4 +353,50 @@ export async function POST(request) {
     console.error('Stripe webhook error:', err?.message)
     return NextResponse.json({ error: 'Webhook handler error' }, { status: 500 })
   }
+}
+
+// ---------------------------------------------------------------------------
+// Email template for the "trial ends in 3 days" heads-up email.
+// ---------------------------------------------------------------------------
+function buildTrialEndingHtml({ firstName, plan, priceLabel, trialEndDate }) {
+  return `
+<!doctype html>
+<html>
+  <body style="margin:0;padding:0;background:#FAFAF9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:#1A1A18;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#FAFAF9;">
+      <tr><td align="center" style="padding:40px 20px;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:520px;background:#FFFFFF;border:1px solid #E8E8E4;border-radius:8px;">
+          <tr><td style="padding:32px 32px 12px 32px;">
+            <span style="font-size:18px;font-weight:700;letter-spacing:-0.025em;color:#1A1A18;">Brikk</span>
+          </td></tr>
+          <tr><td style="padding:4px 32px 24px 32px;">
+            <h1 style="font-size:20px;font-weight:600;letter-spacing:-0.015em;margin:0 0 12px 0;color:#1A1A18;">
+              Your trial ends ${trialEndDate}, ${firstName}.
+            </h1>
+            <p style="font-size:14px;line-height:1.65;color:#1A1A18;margin:0 0 16px 0;">
+              Quick heads-up: your 14-day Brikk trial ends ${trialEndDate}. Your card on file will be charged <strong>${priceLabel}</strong> for the ${plan} plan, plus a one-time $125 setup fee, and your subscription will continue automatically.
+            </p>
+            <p style="font-size:14px;line-height:1.65;color:#1A1A18;margin:0 0 20px 0;">
+              If Brikk's been helping you close more deals, no action needed — we'll keep going. If you want to stop, you can cancel anytime before ${trialEndDate} from Settings → Billing.
+            </p>
+            <p style="margin:0 0 24px 0;">
+              <a href="https://brikk.store/app/settings" style="display:inline-block;background:#1A1A18;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;">Open billing settings</a>
+            </p>
+            <p style="font-size:12px;line-height:1.6;color:#6B6B66;margin:0 0 8px 0;">
+              Once your card is charged, the sale is final — no refunds. See our <a href="https://brikk.store/terms" style="color:#6B6B66;">Terms</a>.
+            </p>
+            <p style="font-size:12px;line-height:1.6;color:#9C9C96;margin:24px 0 0 0;">
+              Questions? Reply to this email — it reaches a real person.
+            </p>
+          </td></tr>
+          <tr><td style="padding:18px 32px;border-top:1px solid #F0F0EC;">
+            <p style="font-size:11px;line-height:1.5;color:#9C9C96;margin:0;">
+              Brikk · <a href="https://brikk.store" style="color:#6B6B66;text-decoration:none;">brikk.store</a> · Built to close
+            </p>
+          </td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>`.trim()
 }

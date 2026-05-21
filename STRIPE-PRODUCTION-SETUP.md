@@ -224,9 +224,44 @@ What needs to be in Vercel (Production):
 
 ---
 
+## Troubleshooting card declines (Radar)
+
+Nathan tightened Radar fraud rules to block highest-risk transactions, fail on CVC mismatch, fail on postal code mismatch, and require 3DS challenge on supported cards. This catches fraud but will occasionally decline legitimate cards. Here's how to recognize what's happening:
+
+**Customer reports "my card was declined":**
+
+1. Stripe Dashboard → Payments → find the failed charge.
+2. Click into it. Look at the **Decline reason** field.
+3. Match against this table:
+
+| Decline reason | What it means | What to tell the customer |
+|----------------|---------------|---------------------------|
+| `card_declined` (generic) | Issuer declined for unspecified reason | "Your bank rejected the charge. Try a different card or call your bank's fraud line." |
+| `incorrect_cvc` | CVC didn't match | "The 3- or 4-digit code on the back of the card didn't match. Re-enter and try again." |
+| `incorrect_zip` / `postal_code_invalid` | Billing ZIP didn't match card on file | "The billing ZIP code didn't match your card's address. Use your bank statement's address." |
+| `insufficient_funds` | Card has insufficient funds | "Insufficient funds on the card. Try a different card." |
+| `expired_card` | Card past expiry | "The card has expired. Please use a current card." |
+| `authentication_required` | 3DS challenge required but failed | "Your bank needs extra verification. Complete the prompt on your bank's app or website." |
+| `do_not_honor` | Issuer blocked transaction | "Your bank blocked this charge. Call them — usually a fraud-prevention flag." |
+| Radar rule: `risk_level=highest` | Stripe Radar flagged as high fraud risk | "Stripe blocked this for security. Try Apple Pay or Link instead — they include extra verification that helps clear the flag." |
+
+**The code already shows friendly user messages** for these via `friendlyStripeError()` in `app/api/stripe/route.js`. So most of the time the customer will see a clear explanation. This table is for when you need to investigate a specific case.
+
+**To temporarily loosen Radar for a known-good customer:**
+- Stripe → Radar → Lists → add their email to "allow_list" or their card fingerprint to "trusted_payment_methods".
+- Their next attempt should clear regardless of risk level.
+
+**Never share decline-code details with the customer in front-end UI** — it gives fraudsters too much info. The friendly mapping intentionally generalizes.
+
+---
+
 ## What I (the code) already handle
 
-- ✅ Checkout session creation with 14-day trial, billing address required, tax ID collection
+- ✅ Checkout session creation with 14-day trial, billing address required, tax ID collection, phone collection
+- ✅ Required TOS agreement at checkout (consent_collection)
+- ✅ Friendly user-facing error mapping for ~10 Stripe decline codes
+- ✅ Trial-ending heads-up email 3 days before charge (reduces surprise-charge chargebacks)
+- ✅ Settings-page success/cancel banner when returning from checkout or portal
 - ✅ Webhook signature verification with replay protection
 - ✅ Idempotent team creation on `checkout.session.completed`
 - ✅ Subscription status sync on create/update/delete/pause/resume/trial_will_end/payment_failed

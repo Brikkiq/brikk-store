@@ -36,8 +36,33 @@ export default function SettingsPage() {
 
   const showToast = (msg, kind = 'success') => {
     setToast({ msg, kind })
-    setTimeout(() => setToast(null), 3000)
+    setTimeout(() => setToast(null), 4500)
   }
+
+  // Handle ?payment=success / ?payment=cancelled returns from Stripe Checkout.
+  // success_url and cancel_url in /api/stripe/route.js both point here. We
+  // surface a banner to the user and clean up the URL so refreshes don't re-show
+  // the message.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    const payment = params.get('payment')
+    if (payment === 'success') {
+      setActiveTab('billing')
+      showToast('🎉 Subscription started. You\'re in your 14-day trial — card on file, no charge until trial ends.', 'success')
+    } else if (payment === 'cancelled') {
+      setActiveTab('billing')
+      showToast('Checkout cancelled. No charge made.', 'info')
+    } else if (params.get('from') === 'portal') {
+      setActiveTab('billing')
+      showToast('Welcome back. Your changes have been saved.', 'success')
+    }
+    if (payment || params.get('from')) {
+      // Strip the query string so a refresh doesn't re-trigger.
+      const cleanUrl = window.location.pathname + window.location.hash
+      window.history.replaceState({}, '', cleanUrl)
+    }
+  }, [])
 
   useEffect(() => {
     loadProfile()
