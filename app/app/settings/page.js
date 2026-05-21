@@ -339,7 +339,7 @@ export default function SettingsPage() {
 
           {activeTab === 'team' && <TeamTab user={user} showToast={showToast} />}
 
-          {activeTab === 'billing' && <BillingTab user={user} saving={saving} setSaving={setSaving} showToast={showToast} />}
+          {activeTab === 'billing' && <BillingTab user={user} profile={profile} saving={saving} setSaving={setSaving} showToast={showToast} />}
           {activeTab === 'referral' && <ReferralTab referralLink={referralLink} referralCode={referralCode} showToast={showToast} />}
           {activeTab === 'privacy' && <PrivacyTab />}
           {activeTab === 'agreement' && <AgreementTab />}
@@ -533,7 +533,12 @@ const Slider = ({ label, value, min, max, onChange, unit, color }) => (
   </div>
 )
 
-const BillingTab = ({ user, saving, setSaving, showToast }) => {
+const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
+  const subscriptionStatus = profile?.subscription_status // 'active' | 'trialing' | 'past_due' | 'canceled' | null
+  const isSubscribed = subscriptionStatus === 'active' || subscriptionStatus === 'trialing'
+  const isPastDue = subscriptionStatus === 'past_due'
+  const subscriptionPlan = profile?.subscription_plan // 'pro' | 'team' | 'agency'
+
   const checkout = async (plan) => {
     setSaving(true)
     try {
@@ -549,6 +554,102 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
     }
     setSaving(false)
   }
+
+  const openPortal = async () => {
+    setSaving(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) {
+        showToast('Sign in expired. Refresh and try again.', 'error')
+        setSaving(false)
+        return
+      }
+      const res = await fetch('/api/stripe/portal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else showToast(data.error || 'Could not open billing portal', 'error')
+    } catch {
+      showToast('Could not open billing portal', 'error')
+    }
+    setSaving(false)
+  }
+
+  // ---- Subscribed state: show current plan + Manage button ----
+  if (isSubscribed) {
+    const planLabel = subscriptionPlan === 'team' ? 'Team' : subscriptionPlan === 'agency' ? 'Agency' : 'Pro'
+    const priceLabel = subscriptionPlan === 'team' ? '$200/month' : subscriptionPlan === 'agency' ? 'Custom' : '$75/month'
+    const isTrial = subscriptionStatus === 'trialing'
+    return (
+      <>
+        <Section title="Current plan">
+          <div style={{
+            background: c.greenSoft, border: `1px solid ${c.greenBorder}`,
+            borderRadius: 6, padding: '14px 16px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>{planLabel} plan {isTrial ? '· Trialing' : '· Active'}</div>
+                <div style={{ ...type.bodySub, marginTop: 2 }}>
+                  {isTrial
+                    ? 'You\'re in your 14-day free trial. Card on file, no charge until trial ends.'
+                    : `${priceLabel}. Renews automatically.`}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+        <Section title="Manage subscription" description="Update your card, download invoices, switch plans, or cancel — all in one place.">
+          <button
+            onClick={openPortal}
+            disabled={saving}
+            style={{ ...btn.primary, opacity: saving ? 0.5 : 1 }}
+          >
+            {saving ? 'Opening…' : 'Open billing portal'}
+          </button>
+          <div style={{ ...type.meta, marginTop: 14 }}>
+            All sales final. No refunds — cancellation stops future charges only. See <a href="/terms" style={{ color: c.dim, textDecoration: 'underline' }}>Terms</a>.
+          </div>
+        </Section>
+      </>
+    )
+  }
+
+  // ---- Past-due state: surface payment failure prominently ----
+  if (isPastDue) {
+    return (
+      <>
+        <Section title="Payment issue">
+          <div style={{
+            background: 'rgba(190,18,60,0.06)', border: `1px solid rgba(190,18,60,0.2)`,
+            borderRadius: 6, padding: '14px 16px',
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#BE123C' }}>Your last payment failed.</div>
+            <div style={{ ...type.bodySub, marginTop: 2 }}>
+              Update your payment method to keep your subscription active. Stripe will retry automatically once you do.
+            </div>
+          </div>
+        </Section>
+        <Section title="Update payment method">
+          <button
+            onClick={openPortal}
+            disabled={saving}
+            style={{ ...btn.primary, opacity: saving ? 0.5 : 1 }}
+          >
+            {saving ? 'Opening…' : 'Open billing portal'}
+          </button>
+        </Section>
+      </>
+    )
+  }
+
+  // ---- Default: not subscribed, show plan picker ----
   return (
     <>
       <Section title="Trial status">
@@ -557,11 +658,11 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
           borderRadius: 6, padding: '14px 16px',
         }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>Free trial active</div>
-          <div style={{ ...type.bodySub, marginTop: 2 }}>Full access to every feature for 14 days. No charge until your trial ends.</div>
+          <div style={{ ...type.bodySub, marginTop: 2 }}>Full access to every feature for 14 days. No charge until you subscribe.</div>
         </div>
       </Section>
 
-      <Section title="Plans" description="Cancel anytime. Switching between plans is supported — contact us if you need help.">
+      <Section title="Plans" description="14-day trial when you subscribe. Cancel anytime to stop future charges.">
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
           <PlanCard
             title="Pro" subtitle="Solo agents"
@@ -586,7 +687,11 @@ const BillingTab = ({ user, saving, setSaving, showToast }) => {
             saving={saving}
           />
         </div>
-        <div style={{ ...type.meta, marginTop: 14 }}>Payments secured by Stripe. 14-day free trial included. Cancel anytime.</div>
+        <div style={{ ...type.meta, marginTop: 14, maxWidth: 560, lineHeight: 1.5 }}>
+          Payments secured by Stripe. Apple Pay, Google Pay, Link, and major cards accepted.
+          <br />
+          <strong style={{ color: c.text }}>All sales final. No refunds</strong> — the 14-day trial is your evaluation window. Cancel anytime to stop future charges. See <a href="/terms" style={{ color: c.dim, textDecoration: 'underline' }}>Terms</a>.
+        </div>
       </Section>
     </>
   )

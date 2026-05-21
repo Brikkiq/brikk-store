@@ -225,6 +225,9 @@ export default function UpgradePage() {
         {/* Reassurance footer */}
         <div style={{ textAlign: 'center', marginTop: 36 }}>
           <div style={{ ...type.meta, marginBottom: 6 }}>Your data is safe. Subscribe and you're back where you left off in seconds.</div>
+          <div style={{ ...type.meta, color: c.dim, marginBottom: 6, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
+            <strong style={{ color: c.text }}>All sales are final. No refunds.</strong> Your 14-day free trial is the time to evaluate Brikk — once you subscribe, monthly fees and the $125 setup fee are non-refundable. You can cancel anytime to stop future charges. By subscribing you agree to our <a href="/terms" style={{ color: c.sub, textDecoration: 'underline' }}>Terms of Service</a>.
+          </div>
           <a href="/app/settings" style={{ ...type.meta, color: c.dim }}>Settings · Privacy · Sign out</a>
         </div>
       </main>

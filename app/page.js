@@ -27,9 +27,20 @@ const Tag=({children,bg,color})=><span style={{fontSize:10,fontWeight:600,paddin
 const MiniProgress=({value,color})=><div style={{background:c.borderLight,borderRadius:2,height:3,width:"100%",overflow:"hidden"}}><div style={{width:`${value}%`,height:"100%",background:color,borderRadius:2}}/></div>
 
 function LiveDemo(){
-  const [screen,setScreen]=useState("actions")
+  const [screen,setScreen]=useState("today")
   const tc={hot:{bg:c.redSoft,color:c.red},warm:{bg:c.amberSoft,color:c.amber},cold:{bg:"rgba(26,26,24,0.04)",color:c.dim}}
-  const screens=["actions","copilot","leads","deals","calendar","marketing","messages"]
+  // Match the actual app's 8-tab mobile bar. "Voice" replaces Settings here since
+  // it's a demo-worthy feature; the real app keeps Settings in tab 8.
+  const screens=[
+    {id:"today",label:"Today"},
+    {id:"copilot",label:"Copilot"},
+    {id:"leads",label:"Leads"},
+    {id:"voice",label:"Voice"},
+    {id:"deals",label:"Deals"},
+    {id:"calendar",label:"Calendar"},
+    {id:"chats",label:"Chats"},
+    {id:"roi",label:"ROI"},
+  ]
   return(
     <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:`1px solid ${c.border}`,background:c.bg}}>
@@ -41,19 +52,25 @@ function LiveDemo(){
       </div>
       <div style={{display:"flex",gap:2,padding:"8px 12px",borderBottom:`1px solid ${c.border}`,overflowX:"auto"}}>
         {screens.map(s=>(
-          <button key={s} onClick={()=>setScreen(s)} style={{background:screen===s?c.text:"transparent",color:screen===s?"#fff":c.dim,border:"none",borderRadius:4,padding:"4px 8px",fontSize:9,fontWeight:600,textTransform:"capitalize",cursor:"pointer",whiteSpace:"nowrap"}}>{s}</button>
+          <button key={s.id} onClick={()=>setScreen(s.id)} style={{background:screen===s.id?c.text:"transparent",color:screen===s.id?"#fff":c.dim,border:"none",borderRadius:4,padding:"4px 10px",fontSize:10,fontWeight:600,cursor:"pointer",whiteSpace:"nowrap"}}>{s.label}</button>
         ))}
       </div>
-      <div style={{padding:"16px",minHeight:320}}>
+      <div style={{padding:"16px",minHeight:340}}>
 
-        {screen==="actions"&&<div>
+        {/* TODAY — quick actions dashboard with a live-alert pill */}
+        {screen==="today"&&<div>
+          {/* Real-time new-lead alert pill */}
+          <div style={{display:"inline-flex",alignItems:"center",gap:6,background:c.greenSoft,border:`1px solid ${c.greenBorder}`,padding:"3px 10px",borderRadius:20,marginBottom:10}}>
+            <div style={{width:6,height:6,borderRadius:"50%",background:c.green,animation:"pulse 2s infinite"}}/>
+            <span style={{fontSize:10,fontWeight:600,color:c.green}}>1 new lead · 12 min ago</span>
+          </div>
           <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Good morning, Alex.</div>
           <div style={{fontSize:11,color:c.dim,marginBottom:12}}>You have 4 things that need your attention.</div>
           {[
             {icon:"!",label:"Call Sarah Mitchell — hot lead, 2 days since contact",color:c.red,bg:c.redSoft},
-            {icon:"$",label:"742 Oak Ave — closing in 3 days",color:c.amber,bg:c.amberSoft},
             {icon:"AI",label:"Copilot has 3 follow-up drafts ready",color:"#6D28D9",bg:"rgba(109,40,217,0.05)"},
-            {icon:"→",label:"Follow up: David Park — going cold",color:c.amber,bg:c.amberSoft},
+            {icon:"$",label:"742 Oak Ave — closing in 3 days",color:c.amber,bg:c.amberSoft},
+            {icon:"→",label:"Reply to Emily — she replied 14m ago",color:c.green,bg:c.greenSoft},
           ].map((a,i)=>(
             <div key={i} style={{padding:"10px 12px",marginBottom:4,borderRadius:6,borderLeft:`3px solid ${a.color}`,background:a.bg,display:"flex",alignItems:"center",gap:10}}>
               <div style={{width:22,height:22,borderRadius:5,background:`${a.color}20`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:a.color}}>{a.icon}</div>
@@ -62,6 +79,7 @@ function LiveDemo(){
           ))}
         </div>}
 
+        {/* COPILOT — drafts with native-send buttons */}
         {screen==="copilot"&&<div>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><div style={{fontSize:13,fontWeight:700}}>AI Copilot</div><Tag bg={c.indigoSoft} color={c.indigo}>2 drafts</Tag></div>
           {[
@@ -72,19 +90,33 @@ function LiveDemo(){
               <div style={{fontSize:12,fontWeight:700,marginBottom:6}}>{d.lead}</div>
               <div style={{fontSize:11,color:c.sub,lineHeight:1.6,marginBottom:6,fontStyle:"italic"}}>"{d.msg}"</div>
               <div style={{fontSize:10,color:c.indigo,marginBottom:8}}>{d.reason}</div>
-              <div style={{display:"flex",gap:6}}><span style={{fontSize:10,fontWeight:600,color:"#fff",background:c.green,padding:"4px 12px",borderRadius:4}}>Approve</span><span style={{fontSize:10,color:c.dim,border:`1px solid ${c.border}`,padding:"4px 12px",borderRadius:4}}>Edit</span></div>
+              <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                <span style={{fontSize:10,fontWeight:600,color:"#fff",background:c.text,padding:"4px 10px",borderRadius:4}}>Send via Messages</span>
+                <span style={{fontSize:10,fontWeight:600,color:c.text,border:`1px solid ${c.border}`,padding:"3px 10px",borderRadius:4}}>Send via Email</span>
+                <span style={{fontSize:10,color:c.dim,border:`1px solid ${c.border}`,padding:"3px 10px",borderRadius:4}}>Edit</span>
+              </div>
             </div>
           ))}
         </div>}
 
+        {/* LEADS — with YOUR TURN read-indicator + temp tags */}
         {screen==="leads"&&<div>
-          <div style={{fontSize:13,fontWeight:700,marginBottom:4}}>Lead Pipeline</div>
-          <div style={{fontSize:11,color:c.dim,marginBottom:12}}>24 active leads</div>
-          {demoLeads.map((l,i)=>{const t2=tc[l.temp];return(
-            <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",borderBottom:`1px solid ${c.borderLight}`}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:4}}>
+            <div style={{fontSize:13,fontWeight:700}}>Lead Pipeline</div>
+            <span style={{fontSize:9,color:c.dim}}>24 active</span>
+          </div>
+          <div style={{fontSize:11,color:c.dim,marginBottom:10}}>Sorted by who needs your attention</div>
+          {demoLeads.map((l,i)=>{const t2=tc[l.temp];const yourTurn=i===0||i===2;return(
+            <div key={i} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"8px 10px",borderBottom:`1px solid ${c.borderLight}`,background:yourTurn?"rgba(190,18,60,0.02)":"transparent"}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
                 <div style={{width:24,height:24,borderRadius:4,background:t2.bg,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:700,color:t2.color}}>{l.name.split(" ").map(n=>n[0]).join("")}</div>
-                <div><div style={{fontSize:11,fontWeight:600}}>{l.name}</div><div style={{fontSize:9,color:c.dim}}>{l.stage}</div></div>
+                <div>
+                  <div style={{display:"flex",alignItems:"center",gap:6}}>
+                    <div style={{fontSize:11,fontWeight:600}}>{l.name}</div>
+                    {yourTurn && <span style={{fontSize:8,fontWeight:700,color:"#fff",background:c.red,padding:"1px 5px",borderRadius:2,letterSpacing:"0.04em"}}>YOUR TURN</span>}
+                  </div>
+                  <div style={{fontSize:9,color:c.dim}}>{yourTurn?`They replied · ${i===0?"14m":"2h"} ago`:`You sent · ${l.days}d ago`}</div>
+                </div>
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6}}>
                 <Tag bg={t2.bg} color={t2.color}>{l.temp.toUpperCase()}</Tag>
@@ -94,20 +126,51 @@ function LiveDemo(){
           )})}
         </div>}
 
+        {/* VOICE — multi-action modal */}
+        {screen==="voice"&&<div>
+          <div style={{fontSize:13,fontWeight:700,marginBottom:6}}>Voice → Actions</div>
+          <div style={{fontSize:10,color:c.dim,marginBottom:10}}>Speak naturally. AI structures it for you.</div>
+          <div style={{background:c.bg,border:`1px solid ${c.borderLight}`,borderRadius:8,padding:"10px 12px",marginBottom:10}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+              <div style={{width:8,height:8,borderRadius:"50%",background:c.red,animation:"pulse 1.5s infinite"}}/>
+              <span style={{fontSize:10,fontWeight:600,color:c.text}}>Just recorded · 0:18</span>
+            </div>
+            <div style={{fontSize:10,color:c.sub,fontStyle:"italic",lineHeight:1.5}}>"Sarah loved the kitchen at the Maple Ave showing. Update her status, add a note, and remind me to text her Saturday morning about a second tour."</div>
+          </div>
+          <div style={{fontSize:9,fontWeight:600,color:c.dim,marginBottom:6,textTransform:"uppercase",letterSpacing:"0.04em"}}>3 actions parsed — review and approve</div>
+          {[
+            {icon:"↻",label:"Update Sarah Mitchell — stage to Showing",color:c.indigo},
+            {icon:"+",label:"Add note: \"Loved kitchen, wants Saturday tour\"",color:c.green},
+            {icon:"⏰",label:"Set follow-up: Text Sarah Sat morning",color:c.amber},
+          ].map((a,i)=>(
+            <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:c.white,border:`1px solid ${c.borderLight}`,borderRadius:5,marginBottom:4}}>
+              <div style={{width:16,height:16,borderRadius:3,border:`1.5px solid ${c.green}`,background:c.green,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:"#fff",fontWeight:700}}>✓</div>
+              <div style={{width:18,height:18,borderRadius:3,background:`${a.color}15`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,color:a.color,fontWeight:700}}>{a.icon}</div>
+              <span style={{fontSize:10.5,color:c.text,flex:1}}>{a.label}</span>
+            </div>
+          ))}
+          <div style={{display:"flex",gap:6,marginTop:8}}>
+            <span style={{fontSize:10,fontWeight:600,color:"#fff",background:c.green,padding:"5px 14px",borderRadius:4}}>Approve all</span>
+            <span style={{fontSize:10,color:c.dim,border:`1px solid ${c.border}`,padding:"4px 12px",borderRadius:4}}>Discard</span>
+          </div>
+        </div>}
+
+        {/* DEALS */}
         {screen==="deals"&&<div>
           <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Active Deals</div>
           {[{addr:"742 Oak Ave",client:"Marcus Johnson",price:"$520,000",pct:65,days:19,flag:"amber"},{addr:"1891 Elm St",client:"Rachel Torres",price:"$415,000",pct:40,days:34,flag:"green"}].map((d,i)=>(
             <div key={i} style={{padding:"10px 12px",marginBottom:8,borderRadius:6,border:`1px solid ${c.borderLight}`,background:c.bg}}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}><span style={{fontSize:12,fontWeight:600}}>{d.addr}</span><span style={{fontSize:12,fontWeight:700,color:c.green}}>{d.price}</span></div>
               <MiniProgress value={d.pct} color={d.flag==="amber"?c.amber:c.green}/>
-              <div style={{fontSize:10,color:c.dim,marginTop:4}}>{d.client} / {d.days}d to close</div>
+              <div style={{fontSize:10,color:c.dim,marginTop:4}}>{d.client} · {d.days}d to close</div>
             </div>
           ))}
         </div>}
 
+        {/* CALENDAR */}
         {screen==="calendar"&&<div>
           <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Smart Calendar</div>
-          {[{time:"Today",label:"Call Sarah Mitchell",color:c.indigo,ai:"She viewed 3 listings last night."},{time:"Today",label:"Listing appt: Linda Chen",color:c.amber,ai:"Bring updated CMA."},{time:"Tomorrow",label:"Inspection: 742 Oak Ave",color:c.red,ai:"Lender unresponsive — confirm financing."}].map((e,i)=>(
+          {[{time:"Today · 2 PM",label:"Call Sarah Mitchell",color:c.indigo,ai:"She viewed 3 listings last night."},{time:"Today · 4 PM",label:"Listing appt: Linda Chen",color:c.amber,ai:"Bring updated CMA."},{time:"Tomorrow · 10 AM",label:"Inspection: 742 Oak Ave",color:c.red,ai:"Lender unresponsive — confirm financing."}].map((e,i)=>(
             <div key={i} style={{marginBottom:6,padding:"10px 12px",background:c.bg,borderRadius:6,border:`1px solid ${c.borderLight}`}}>
               <div style={{display:"flex",alignItems:"center",gap:8}}><div style={{width:3,height:22,borderRadius:2,background:e.color}}/><div><div style={{fontSize:11,fontWeight:600}}>{e.label}</div><div style={{fontSize:9,color:c.dim}}>{e.time}</div></div></div>
               {e.ai&&<div style={{marginLeft:11,background:"rgba(67,56,202,0.04)",borderRadius:4,padding:"5px 8px",marginTop:4}}><div style={{fontSize:9,fontWeight:600,color:"#6D28D9"}}>AI Context</div><div style={{fontSize:9,color:c.sub}}>{e.ai}</div></div>}
@@ -115,27 +178,52 @@ function LiveDemo(){
           ))}
         </div>}
 
-        {screen==="marketing"&&<div>
+        {/* CHATS — quick-reply pills + Reply with AI + native send */}
+        {screen==="chats"&&<div>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700}}>Sarah Mitchell</div>
+            <span style={{fontSize:8,fontWeight:700,color:"#fff",background:c.red,padding:"1px 5px",borderRadius:2}}>YOUR TURN</span>
+          </div>
+          <div style={{background:c.bg,borderRadius:8,border:`1px solid ${c.borderLight}`,padding:"10px"}}>
+            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}>
+              <div style={{background:c.text,color:"#fff",borderRadius:"10px 10px 2px 10px",padding:"7px 11px",fontSize:11,maxWidth:"82%"}}>Hi Sarah, I have 3 new listings in your range. Free for a call Thursday?</div>
+            </div>
+            <div style={{display:"flex",justifyContent:"flex-start",marginBottom:8}}>
+              <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:"10px 10px 10px 2px",padding:"7px 11px",fontSize:11,maxWidth:"82%"}}>Yes! Thursday at 2 works great.</div>
+            </div>
+            {/* Reply with AI */}
+            <div style={{display:"flex",justifyContent:"flex-start",marginBottom:8}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:5,background:"rgba(109,40,217,0.08)",border:`1px solid rgba(109,40,217,0.2)`,padding:"3px 9px",borderRadius:14,fontSize:10,fontWeight:600,color:"#6D28D9"}}>
+                <span style={{fontSize:11}}>✨</span> Reply with AI
+              </div>
+            </div>
+            {/* Quick-reply pills */}
+            <div style={{display:"flex",flexWrap:"wrap",gap:4,marginBottom:8}}>
+              {["Confirm Thursday 2 PM","Send address","Reschedule"].map((q,i)=>(
+                <span key={i} style={{fontSize:9.5,color:c.sub,background:c.white,border:`1px solid ${c.border}`,padding:"3px 8px",borderRadius:11}}>{q}</span>
+              ))}
+            </div>
+            <div style={{display:"flex",gap:6,alignItems:"center"}}>
+              <div style={{flex:1,background:c.white,border:`1px solid ${c.border}`,borderRadius:6,padding:"7px 10px",fontSize:11,color:c.dim}}>Type a message…</div>
+              <div style={{background:c.text,color:"#fff",borderRadius:6,padding:"7px 11px",fontSize:10.5,fontWeight:600,whiteSpace:"nowrap"}}>Send via Messages</div>
+            </div>
+            <div style={{fontSize:8.5,color:c.dim,marginTop:6,textAlign:"center"}}>Opens your phone's messaging app. Sent from your number.</div>
+          </div>
+        </div>}
+
+        {/* ROI */}
+        {screen==="roi"&&<div>
           <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Marketing ROI</div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:12}}>
             {[["Top Source","Referrals — 42%",c.green],["Worst ROI","Zillow — 6%",c.red],["Total Leads","104",c.text],["Hot Rate","24%",c.amber]].map(([k,v,cl],i)=>(
               <div key={i} style={{background:c.bg,borderRadius:6,padding:"10px 12px",border:`1px solid ${c.borderLight}`}}><div style={{fontSize:8,fontWeight:600,color:c.dim,textTransform:"uppercase"}}>{k}</div><div style={{fontSize:11,fontWeight:600,color:cl,marginTop:2}}>{v}</div></div>
             ))}
           </div>
-          <div style={{background:"rgba(67,56,202,0.04)",borderRadius:6,padding:"8px 10px"}}><div style={{fontSize:9,fontWeight:600,color:c.indigo,marginBottom:2}}>AI Insight</div><div style={{fontSize:9,color:c.sub}}>Referrals convert 7x better than Zillow at $0 cost. Shift budget toward referral programs.</div></div>
-        </div>}
-
-        {screen==="messages"&&<div>
-          <div style={{fontSize:13,fontWeight:700,marginBottom:12}}>Messages</div>
-          <div style={{background:c.bg,borderRadius:8,border:`1px solid ${c.borderLight}`,padding:"12px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}><div style={{width:28,height:28,borderRadius:6,background:c.redSoft,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:c.red}}>SM</div><div><div style={{fontSize:12,fontWeight:600}}>Sarah Mitchell</div><div style={{fontSize:9,color:c.dim}}>Hot / Buyer / Zillow</div></div></div>
-            <div style={{display:"flex",justifyContent:"flex-end",marginBottom:6}}><div style={{background:c.text,color:"#fff",borderRadius:"10px 10px 2px 10px",padding:"8px 12px",fontSize:11,maxWidth:"80%"}}>Hi Sarah, I have 3 new listings in your range. Free for a call Thursday?</div></div>
-            <div style={{display:"flex",justifyContent:"flex-start",marginBottom:8}}><div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:"10px 10px 10px 2px",padding:"8px 12px",fontSize:11,maxWidth:"80%"}}>Yes! Thursday at 2 works great.</div></div>
-            <div style={{background:"rgba(109,40,217,0.05)",borderRadius:6,padding:"6px 10px",marginBottom:8}}><span style={{fontSize:9,fontWeight:600,color:"#6D28D9"}}>Draft with AI Copilot</span></div>
-            <div style={{display:"flex",gap:6}}><div style={{flex:1,background:c.white,border:`1px solid ${c.border}`,borderRadius:6,padding:"8px 10px",fontSize:11,color:c.dim}}>Type a message...</div><div style={{background:c.text,color:"#fff",borderRadius:6,padding:"8px 14px",fontSize:11,fontWeight:600}}>Send</div></div>
-          </div>
+          <div style={{background:"rgba(67,56,202,0.04)",borderRadius:6,padding:"8px 10px"}}><div style={{fontSize:9,fontWeight:600,color:c.indigo,marginBottom:2}}>AI Insight</div><div style={{fontSize:9,color:c.sub}}>Referrals convert 7× better than Zillow at $0 cost. Shift budget toward referral programs.</div></div>
         </div>}
       </div>
+      {/* Pulse keyframe — used by live alert + voice mic */}
+      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
     </div>
   )
 }
@@ -440,6 +528,7 @@ export default function Home(){
             </div>
           </div>
           <p style={{fontSize:12,color:c.dim,marginTop:16,textAlign:"center"}}>No credit card required to start</p>
+          <p style={{fontSize:11,color:c.dim,marginTop:6,textAlign:"center",maxWidth:520,marginLeft:"auto",marginRight:"auto",lineHeight:1.5}}>All sales final. No refunds — the 14-day trial is your evaluation window. Cancel anytime to stop future charges. See <a href="/terms" style={{color:c.dim,textDecoration:"underline"}}>Terms</a>.</p>
         </div>
       </section>
 

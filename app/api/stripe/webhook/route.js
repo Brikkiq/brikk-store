@@ -275,6 +275,45 @@ export async function POST(request) {
       return NextResponse.json({ ok: true })
     }
 
+    // -------------------------------------------------- Trial ending in ~3 days
+    // Stripe fires this 3 days before a trial converts to paid. Good place to
+    // mark the profile so the morning brief / dashboard can show a heads-up,
+    // reducing surprise-charge chargebacks.
+    if (event.type === 'customer.subscription.trial_will_end') {
+      const subscription = event.data.object
+      await supabase.from('profiles').update({
+        subscription_status: 'trial_ending',
+        updated_at: new Date().toISOString(),
+      }).eq('stripe_subscription_id', subscription.id)
+      return NextResponse.json({ ok: true })
+    }
+
+    // -------------------------------------------------- Subscription paused
+    // Some plans support pausing instead of cancelling. Treat as past_due so
+    // the paywall kicks in but the team/data is preserved.
+    if (event.type === 'customer.subscription.paused') {
+      const subscription = event.data.object
+      await supabase.from('teams').update({
+        status: 'past_due', updated_at: new Date().toISOString(),
+      }).eq('stripe_subscription_id', subscription.id)
+      await supabase.from('profiles').update({
+        subscription_status: 'paused', updated_at: new Date().toISOString(),
+      }).eq('stripe_subscription_id', subscription.id)
+      return NextResponse.json({ ok: true })
+    }
+
+    // -------------------------------------------------- Subscription resumed
+    if (event.type === 'customer.subscription.resumed') {
+      const subscription = event.data.object
+      await supabase.from('teams').update({
+        status: 'active', updated_at: new Date().toISOString(),
+      }).eq('stripe_subscription_id', subscription.id)
+      await supabase.from('profiles').update({
+        subscription_status: 'active', updated_at: new Date().toISOString(),
+      }).eq('stripe_subscription_id', subscription.id)
+      return NextResponse.json({ ok: true })
+    }
+
     // Any other event: just ack so Stripe stops retrying
     return NextResponse.json({ ok: true, event: event.type, handled: false })
   } catch (err) {
