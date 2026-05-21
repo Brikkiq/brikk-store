@@ -44,11 +44,13 @@ export async function POST(request) {
         'line_items[0][quantity]': '1',
         'line_items[1][price]': prices.setup,
         'line_items[1][quantity]': '1',
+        // Card is the base method. Apple Pay, Google Pay and Link all ride on the
+        // card method type and show up automatically on supported browsers/devices.
         'payment_method_types[0]': 'card',
         allow_promotion_codes: 'true',
         billing_address_collection: 'auto',
-        // Plan + user metadata is duplicated onto the subscription so the webhook
-        // can identify the plan even if the checkout session has been garbage-collected.
+        // Duplicate plan + user metadata onto the subscription so the webhook
+        // can identify the plan even after the checkout session has expired.
         'metadata[plan]': plan,
         'metadata[userId]': userId || '',
         'subscription_data[metadata][plan]': plan,
@@ -56,4 +58,15 @@ export async function POST(request) {
       }).toString(),
     })
 
-    const session = await r
+    const session = await res.json()
+    if (session.error) {
+      console.error('Stripe error:', session.error)
+      return NextResponse.json({ error: session.error.message }, { status: 400 })
+    }
+
+    return NextResponse.json({ url: session.url, sessionId: session.id })
+  } catch (err) {
+    console.error('Stripe API error:', err?.message)
+    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
+  }
+}

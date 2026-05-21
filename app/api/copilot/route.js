@@ -382,4 +382,88 @@ This is NOT a first contact. Read the conversation history below carefully. Your
 You're reaching out for the first time, or there's no logged history yet. Introduce yourself briefly. State one specific reason you're reaching out (their source, their stated need, your local expertise). Make the ask small.`
 }
 
-LEAD 
+LEAD CONTEXT:
+- Name: ${lead.name}
+- Buyer or Seller: ${lead.lead_type || 'Buyer'}
+- How they came in: ${lead.source || 'Unknown source'}
+- Temperature: ${lead.temperature || 'warm'}
+- Pipeline stage: ${lead.stage || 'New Lead'}
+- Price range: ${lead.price_range || 'Not specified'}
+- Days since you last contacted them: ${daysSinceContact}
+- Preferred area: ${lead.preferred_area || 'Not specified'}
+- Bedrooms wanted: ${lead.bedrooms || 'Not specified'}
+- Pre-approved: ${lead.pre_approved ? 'Yes' + (lead.pre_approved_amount ? ' at ' + lead.pre_approved_amount : '') : 'Not on file'}
+- Timeline: ${lead.timeline || 'Not specified'}
+- Contact preference: ${lead.contact_preference || 'text'}
+- Notes: ${lead.notes || 'None'}${historyContext}${interactionContext}
+
+URGENCY HINT:
+${lead.temperature === 'hot' && daysSinceContact >= 2 ? '⚠ Hot lead, gone cold for several days. Create urgency without being pushy.' : ''}
+${daysSinceContact >= 7 ? '⚠ Long gap since contact. Acknowledge the time gap honestly or offer a clear reason for reaching out now (new listings, market shift, an answer to a question they asked).' : ''}
+${(lead.recent_messages || []).filter(m => m.direction === 'inbound').length >= 2 ? '📈 They\'ve been actively engaging. Match their energy — be more direct, suggest a concrete next step like a showing time.' : ''}
+
+Respond with ONLY a valid JSON object. No markdown, no commentary.
+{
+  "message": "the SMS-ready draft",
+  "reason": "one sentence on why this message, why now, and what signal from their history shaped it"
+}`
+
+      const fallback = () => ({
+        lead_id: lead.id,
+        lead_name: lead.name,
+        lead_type: lead.lead_type,
+        temperature: lead.temperature,
+        source: lead.source,
+        stage: lead.stage,
+        days_since_contact: daysSinceContact,
+        channel: daysSinceContact > 7 ? 'Email' : 'Text',
+        urgency: 'medium',
+        draft: `Hi ${lead.name}, this is ${agentName || 'Alex'}. Wanted to reach out${lead.price_range ? ' about properties in the ' + lead.price_range + ' range' : ''} — I have a few options I think you'd want to see. Got a few minutes this week?`,
+        reason: `${daysSinceContact} days without contact. Auto-generated fallback — please edit before sending.`,
+      })
+
+      try {
+        const data = await callClaude({
+          model: MODEL,
+          max_tokens: 220,
+          messages: [{ role: 'user', content: prompt }],
+        })
+        const text = data.content?.[0]?.text || ''
+        const parsed = safeJson(text)
+        const draftMessage = parsed?.message || ''
+        const draftReason = parsed?.reason || `${daysSinceContact} days since contact.`
+
+        if (!draftMessage) {
+          drafts.push(fallback())
+          continue
+        }
+
+        drafts.push({
+          lead_id: lead.id,
+          lead_name: lead.name,
+          lead_type: lead.lead_type,
+          temperature: lead.temperature,
+          source: lead.source,
+          stage: lead.stage,
+          days_since_contact: daysSinceContact,
+          channel: daysSinceContact > 7 ? 'Email' : 'Text',
+          urgency:
+            lead.temperature === 'hot' && daysSinceContact >= 2 ? 'high'
+            : daysSinceContact >= 5 ? 'high'
+            : daysSinceContact >= 3 ? 'medium'
+            : 'low',
+          draft: draftMessage,
+          reason: draftReason,
+        })
+      } catch (err) {
+        console.error('Draft generation failed for', lead.name, err.message)
+        drafts.push(fallback())
+      }
+    }
+
+    return NextResponse.json({ drafts })
+  } catch (error) {
+    console.error('Copilot API error:', error)
+    return NextResponse.json({ error: 'Failed to generate drafts' }, { status: 500 })
+  }
+}
