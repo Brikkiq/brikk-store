@@ -270,7 +270,7 @@ Return ONLY the JSON.`,
       const q = String(question).toLowerCase()
       const fallbacks = {
         'price|cost|how much|pricing|expensive|cheap|afford':
-          `Brikk Pro is $75/month for solo agents, Teams is $200/month for up to 5 agents, plus a one-time $125 setup fee. Your first 14 days are completely free — no credit card needed.`,
+          `Brikk Pro is $69.99/month for solo agents, Teams is $160/month for up to 5 agents. No setup fee. Your first 14 days are completely free — no credit card needed.`,
         'what is brikk|what does brikk do|point of this|purpose':
           `Brikk is the one screen you open every morning that tells you exactly what to do. It tracks your leads, drafts your follow-up messages with AI, manages your deals to closing, and shows you which marketing channels actually work.`,
         'feature|what can it do|capabilities|tools':
@@ -298,7 +298,7 @@ Return ONLY the JSON.`,
           system: `You are the AI assistant on Brikk's website (brikk.store), an AI-powered command center for real estate agents.
 
 Key facts:
-- Price: $75/mo Pro, $200/mo Teams (up to 5 seats), $125 one-time setup, 14-day free trial.
+- Price: $69.99/mo Pro, $160/mo Teams (up to 5 seats), no setup fee, 14-day free trial.
 - Features: AI Copilot, Lead Pipeline (18 fields), Deal Tracker, Smart Calendar, Marketing ROI, in-app SMS, Voice-to-CRM, Lead Capture Link.
 - Competitors charge $300-500/mo.
 - Works on iPhone, Android, desktop.
@@ -314,7 +314,7 @@ Tone: warm, concise, honest. 2-3 sentences max unless they ask for detail. If un
       }
       return NextResponse.json({
         answer:
-          "Brikk is the AI command center for real estate agents — $75/mo with a 14-day free trial. What would you like to know — features, pricing, or how to get started?",
+          "Brikk is the AI command center for real estate agents — $69.99/mo with a 14-day free trial, no setup fee. What would you like to know — features, pricing, or how to get started?",
       })
     }
 
@@ -335,14 +335,31 @@ Tone: warm, concise, honest. 2-3 sentences max unless they ask for detail. If un
       let historyContext = ''
       if (lead.recent_messages?.length) {
         historyContext =
-          '\n\nPrevious messages (most recent first):\n' +
+          '\n\nPrevious messages (most recent first, includes hour-of-day for response pattern analysis):\n' +
           lead.recent_messages
             .map(m => {
               const dir = m.direction === 'outbound' ? 'You sent' : 'They replied'
-              const date = new Date(m.created_at).toLocaleDateString()
-              return `- ${dir} (${date}): "${m.content}"`
+              const d = new Date(m.created_at)
+              const date = d.toLocaleDateString()
+              const hour = d.getHours()
+              const hourLabel = `${hour % 12 || 12}${hour < 12 ? 'am' : 'pm'}`
+              return `- ${dir} ${date} @${hourLabel}: "${m.content}"`
             })
             .join('\n')
+      }
+
+      // Analyze the lead's reply timing — what hours have they historically responded?
+      // We surface this as a "best time" hint in the draft so the agent knows when to send.
+      let bestTimeHint = null
+      if (lead.recent_messages?.length >= 2) {
+        const inboundHours = lead.recent_messages
+          .filter(m => m.direction === 'inbound')
+          .map(m => new Date(m.created_at).getHours())
+        if (inboundHours.length >= 2) {
+          const avg = Math.round(inboundHours.reduce((a, b) => a + b, 0) / inboundHours.length)
+          const label = `${avg % 12 || 12}${avg < 12 ? 'am' : 'pm'}`
+          bestTimeHint = `This lead typically replies around ${label} — consider sending near that window.`
+        }
       }
       let interactionContext = ''
       if (lead.recent_interactions?.length) {
@@ -459,6 +476,7 @@ Respond with ONLY a valid JSON object. No markdown, no commentary.
             : 'low',
           draft: draftMessage,
           reason: draftReason,
+          best_time_hint: bestTimeHint,
         })
       } catch (err) {
         console.error('Draft generation failed for', lead.name, err.message)

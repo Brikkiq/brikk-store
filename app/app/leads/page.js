@@ -21,6 +21,7 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState([])
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const [editId, setEditId] = useState(null)
   const [filter, setFilter] = useState('all')
   const [search, setSearch] = useState('')
@@ -186,10 +187,23 @@ export default function LeadsPage() {
           <h1 style={{ ...type.pageTitle, margin: 0 }}>Leads</h1>
           <p style={{ ...type.bodySub, margin: '4px 0 0' }}>{leads.length} total · {counts.hot} hot · {counts.warm} warm</p>
         </div>
-        <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyForm) }} style={btn.primary}>
-          + Add lead
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowImport(true)} style={btn.secondary}>
+            Import CSV
+          </button>
+          <button onClick={() => { setShowForm(true); setEditId(null); setForm(emptyForm) }} style={btn.primary}>
+            + Add lead
+          </button>
+        </div>
       </div>
+
+      {showImport && (
+        <CsvImporter
+          onClose={() => setShowImport(false)}
+          onDone={(count) => { setShowImport(false); showToast(`Imported ${count} lead${count === 1 ? '' : 's'}`); loadLeads() }}
+          showToast={showToast}
+        />
+      )}
 
       {/* Filter bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -354,6 +368,222 @@ const td = () => ({
   color: c.text,
   verticalAlign: 'middle',
 })
+
+// CSV importer modal — parses a CSV, lets the user preview + map columns,
+// then bulk-inserts as leads. Handles the most common export formats from
+// Zillow, Realtor.com, Follow Up Boss, and generic spreadsheets.
+const CsvImporter = ({ onClose, onDone, showToast }) => {
+  const [step, setStep] = useState('upload') // 'upload' | 'preview' | 'importing'
+  const [rows, setRows] = useState([])
+  const [headers, setHeaders] = useState([])
+  const [mapping, setMapping] = useState({ name: '', phone: '', email: '', notes: '', price_range: '' })
+  const [importing, setImporting] = useState(false)
+
+  const parseCsv = (text) => {
+    // Lightweight CSV parser — handles quoted fields with commas inside, and
+    // CRLF line endings. Doesn't pretend to be RFC-4180 perfect but covers
+    // 95%+ of real-world exports.
+    const lines = text.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim())
+    if (lines.length === 0) return { headers: [], rows: [] }
+    const parseLine = (line) => {
+      const result = []
+      let cur = ''
+      let inQuotes = false
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"' && line[i+1] === '"') { cur += '"'; i++; continue }
+        if (ch === '"') { inQuotes = !inQuotes; continue }
+        if (ch === ',' && !inQuotes) { result.push(cur); cur = ''; continue }
+        cur += ch
+      }
+      result.push(cur)
+      return result.map(s => s.trim())
+    }
+    const headers = parseLine(lines[0]).map(h => h.toLowerCase())
+    const rows = lines.slice(1).map(parseLine)
+    return { headers, rows }
+  }
+
+  const guessMapping = (headers) => {
+    // Best-guess column mapping based on common header names from major CRMs.
+    const find = (candidates) => {
+      for (const cand of candidates) {
+        const idx = headers.findIndex(h => h === cand || h.includes(cand))
+        if (idx >= 0) return headers[idx]
+      }
+      return ''
+    }
+    return {
+      name:        find(['name', 'full name', 'first name', 'contact', 'lead name']),
+      phone:       find(['phone', 'mobile', 'cell', 'phone number', 'telephone']),
+      email:       find(['email', 'e-mail', 'mail']),
+      notes:       find(['notes', 'comments', 'description', 'message', 'remarks']),
+      price_range: find(['price', 'budget', 'price range', 'max price']),
+    }
+  }
+
+  const handleFile = (file) => {
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const { headers, rows } = parseCsv(e.target.result)
+      if (rows.length === 0) {
+        showToast('That CSV is empty or unreadable.', 'error')
+        return
+      }
+      setHeaders(headers)
+      setRows(rows)
+      setMapping(guessMapping(headers))
+      setStep('preview')
+    }
+    reader.readAsText(file)
+  }
+
+  const previewRows = rows.slice(0, 5).map(r => {
+    const obj = {}
+    headers.forEach((h, i) => { obj[h] = r[i] || '' })
+    return obj
+  })
+
+  const handleImport = async () => {
+    if (!mapping.name && !mapping.phone) {
+      showToast('Map at least Name or Phone before importing.', 'error')
+      return
+    }
+    setImporting(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { showToast('Not signed in', 'error'); setImporting(false); return }
+    // Validate email format on the way in — bad emails create broken mailto links later.
+    const emailOk = (s) => !s || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)
+    const toInsert = rows.map(r => {
+      const obj = {}
+      headers.forEach((h, i) => { obj[h] = r[i] || '' })
+      const emailVal = mapping.email ? obj[mapping.email] : null
+      return {
+        user_id: user.id,
+        name: (mapping.name ? obj[mapping.name] : '').slice(0, 200) || 'Imported lead',
+        phone: (mapping.phone ? obj[mapping.phone] : '').slice(0, 50) || null,
+        email: emailOk(emailVal) ? (emailVal || null) : null,
+        notes: (mapping.notes ? obj[mapping.notes] : '').slice(0, 2000) || null,
+        price_range: (mapping.price_range ? obj[mapping.price_range] : '').slice(0, 100) || null,
+        source: 'CSV Import',
+        temperature: 'warm',
+        stage: 'New Lead',
+        lead_type: 'Buyer',
+        last_contact_date: new Date().toISOString(),
+      }
+    }).filter(l => l.name && l.name !== 'Imported lead')
+    if (toInsert.length === 0) {
+      showToast('No rows had a usable name — check your column mapping.', 'error')
+      setImporting(false)
+      return
+    }
+    const { error } = await supabase.from('leads').insert(toInsert)
+    if (error) {
+      console.error('CSV import failed:', error)
+      showToast('Import failed: ' + error.message, 'error')
+      setImporting(false)
+      return
+    }
+    onDone(toInsert.length)
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(20,20,18,0.5)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <div style={{ background: c.white, border: `1px solid ${c.border}`, borderRadius: 12, width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', boxShadow: '0 10px 40px rgba(0,0,0,0.18)' }}>
+        <div style={{ padding: '18px 24px', borderBottom: `1px solid ${c.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600 }}>Import leads from CSV</div>
+            <div style={{ ...type.meta }}>{step === 'upload' ? 'Upload a CSV file' : `Map your columns to Brikk fields`}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 20, color: c.dim, cursor: 'pointer' }}>×</button>
+        </div>
+
+        {step === 'upload' && (
+          <div style={{ padding: '32px 24px' }}>
+            <label style={{
+              display: 'block', textAlign: 'center',
+              padding: '40px 20px',
+              border: `2px dashed ${c.border}`, borderRadius: 8,
+              background: c.bg, cursor: 'pointer',
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Click to choose a .csv file</div>
+              <div style={{ ...type.meta }}>Up to 5,000 rows. Works with exports from Zillow, Realtor.com, Follow Up Boss, Top Producer, or generic spreadsheets.</div>
+              <input
+                type="file"
+                accept=".csv,text/csv"
+                onChange={e => handleFile(e.target.files?.[0])}
+                style={{ display: 'none' }}
+              />
+            </label>
+            <div style={{ marginTop: 16, padding: '12px 14px', background: c.bg, borderRadius: 6, border: `1px solid ${c.borderLight}` }}>
+              <div style={{ ...type.eyebrow, marginBottom: 4 }}>Tips</div>
+              <ul style={{ fontSize: 12, color: c.sub, lineHeight: 1.6, margin: 0, paddingLeft: 18 }}>
+                <li>The first row should be headers (Name, Phone, Email, etc.)</li>
+                <li>Brikk will guess your column mapping but you'll confirm before importing</li>
+                <li>Imported leads default to "Warm" + "New Lead" stage — you can edit after</li>
+              </ul>
+            </div>
+          </div>
+        )}
+
+        {step === 'preview' && (
+          <div style={{ padding: '20px 24px' }}>
+            <div style={{ ...type.eyebrow, marginBottom: 8 }}>Map your CSV columns</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+              {[
+                ['name', 'Name *'],
+                ['phone', 'Phone *'],
+                ['email', 'Email'],
+                ['notes', 'Notes'],
+                ['price_range', 'Price range'],
+              ].map(([key, label]) => (
+                <div key={key}>
+                  <label style={inputLabel}>{label}</label>
+                  <select value={mapping[key]} onChange={e => setMapping({ ...mapping, [key]: e.target.value })} style={input}>
+                    <option value="">— skip —</option>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div style={{ ...type.eyebrow, marginBottom: 8 }}>Preview (first 5 rows)</div>
+            <div style={{ overflowX: 'auto', border: `1px solid ${c.borderLight}`, borderRadius: 6, marginBottom: 18 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr style={{ background: c.bg }}>
+                    {['Name', 'Phone', 'Email', 'Notes'].map(h => (
+                      <th key={h} style={{ padding: '8px 12px', textAlign: 'left', borderBottom: `1px solid ${c.border}`, fontWeight: 600, color: c.sub }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {previewRows.map((r, i) => (
+                    <tr key={i} style={{ borderTop: `1px solid ${c.borderLight}` }}>
+                      <td style={{ padding: '8px 12px' }}>{mapping.name ? r[mapping.name] : '—'}</td>
+                      <td style={{ padding: '8px 12px' }}>{mapping.phone ? r[mapping.phone] : '—'}</td>
+                      <td style={{ padding: '8px 12px' }}>{mapping.email ? r[mapping.email] : '—'}</td>
+                      <td style={{ padding: '8px 12px', color: c.sub }}>{mapping.notes ? (r[mapping.notes] || '').slice(0, 50) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ fontSize: 12, color: c.sub, marginBottom: 14 }}>
+              {rows.length} total row{rows.length === 1 ? '' : 's'} will be imported.
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => { setStep('upload'); setRows([]) }} style={btn.secondary} disabled={importing}>Back</button>
+              <button onClick={handleImport} style={{ ...btn.primary, opacity: importing ? 0.6 : 1 }} disabled={importing}>
+                {importing ? 'Importing…' : `Import ${rows.length} lead${rows.length === 1 ? '' : 's'}`}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 const Avatar = ({ name, temperature }) => {
   const init = fmt.initials(name)

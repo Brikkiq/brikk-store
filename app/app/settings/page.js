@@ -626,7 +626,7 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
   // ---- Subscribed state: show current plan + Manage button ----
   if (isSubscribed) {
     const planLabel = subscriptionPlan === 'team' ? 'Team' : subscriptionPlan === 'agency' ? 'Agency' : 'Pro'
-    const priceLabel = subscriptionPlan === 'team' ? '$200/month' : subscriptionPlan === 'agency' ? 'Custom' : '$75/month'
+    const priceLabel = subscriptionPlan === 'team' ? '$160/month' : subscriptionPlan === 'agency' ? 'Custom' : '$69.99/month'
     const isTrial = subscriptionStatus === 'trialing'
     return (
       <>
@@ -708,7 +708,7 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
           <PlanCard
             title="Pro" subtitle="Solo agents"
-            price="$75" period="/mo" setup="+$125 setup"
+            price="$69.99" period="/mo" setup="No setup fee"
             features="AI Copilot · Pipeline · Deals · Calendar · Marketing · Messages · Voice-to-CRM · Lead capture link"
             primary
             onClick={() => checkout('pro')}
@@ -716,7 +716,7 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
           />
           <PlanCard
             title="Team" subtitle="Up to 5 agents"
-            price="$200" period="/mo" setup="+$125 setup"
+            price="$160" period="/mo" setup="No setup fee"
             features="Everything in Pro plus team management with shared seats, team code for member onboarding, and priority support."
             onClick={() => checkout('team')}
             saving={saving}

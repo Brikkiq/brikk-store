@@ -12,15 +12,13 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://brikk.store'
 // Stripe Dashboard. Until then, leaving this off avoids 400 errors at checkout.
 const ENABLE_STRIPE_TAX = process.env.STRIPE_ENABLE_TAX === 'true'
 
+// Stripe Price IDs come from env vars so Henry can swap to new prices in
+// Stripe Dashboard without a code deploy. Fallbacks are the original prices.
+// IMPORTANT: setup fees were removed in May 2026 — only monthly subscriptions
+// are billed now. See PRICING-CHANGE.md.
 const PRICES = {
-  pro: {
-    monthly: 'price_1TMALg2MsBrmQDSseFz1jgY4',
-    setup:   'price_1TMAN52MsBrmQDSs6JLxHq2q',
-  },
-  team: {
-    monthly: 'price_1TMAOF2MsBrmQDSsosNK9PDd',
-    setup:   'price_1TMAOY2MsBrmQDSssZerYEDF',
-  },
+  pro:  process.env.STRIPE_PRICE_PRO  || 'price_1TMALg2MsBrmQDSseFz1jgY4',  // legacy fallback ($75/mo)
+  team: process.env.STRIPE_PRICE_TEAM || 'price_1TMAOF2MsBrmQDSsosNK9PDd',  // legacy fallback ($200/mo)
 }
 
 export async function POST(request) {
@@ -34,7 +32,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }
 
-    const prices = PRICES[plan]
+    const monthlyPriceId = PRICES[plan]
 
     // Build the form payload. We deliberately do NOT pass payment_method_types —
     // omitting it tells Stripe to use the Dashboard-configured Payment Methods
@@ -56,10 +54,8 @@ export async function POST(request) {
       customer_email: email || '',
       client_reference_id: userId || '',
       'subscription_data[trial_period_days]': '14',
-      'line_items[0][price]': prices.monthly,
+      'line_items[0][price]': monthlyPriceId,
       'line_items[0][quantity]': '1',
-      'line_items[1][price]': prices.setup,
-      'line_items[1][quantity]': '1',
       allow_promotion_codes: 'true',
       // Required for accurate tax calc and stronger fraud signals.
       billing_address_collection: 'required',

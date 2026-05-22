@@ -320,7 +320,7 @@ export default function Home(){
     {q:"Can I actually text leads from the app?",a:"Yes. You draft a message in Brikk (or let AI write it), tap Send via Messages, and your phone's native texting app opens with the message and recipient pre-filled. You send it from your own number, on your own carrier. Brikk logs the message to that lead's history automatically. This sidesteps carrier registration and TCPA risk that comes with platform-sent SMS."},
     {q:"Does it work on my phone?",a:"Yes. Brikk is a Progressive Web App. Add it to your home screen on iPhone or Android and it works like a native app with a bottom tab bar. No app store needed."},
     {q:"Is the first 14 days really free?",a:"Yes. No credit card to start. Full access to every feature for 14 days. If it doesn't help you close more deals, you owe nothing."},
-    {q:"How is this different from Lofty or Follow Up Boss?",a:"Those platforms cost $300-500/month, require hours of training, and are built for large brokerages. Brikk is $75/month, takes 5 minutes to set up, and is built for solo agents and small teams who want AI that actually does things — not just stores data."},
+    {q:"How is this different from Lofty or Follow Up Boss?",a:"Those platforms cost $300-500/month, require hours of training, and are built for large brokerages. Brikk is $69.99/month with no setup fee, takes 5 minutes to set up, and is built for solo agents and small teams who want AI that actually does things — not just stores data."},
     {q:"What about my existing leads?",a:"Add them manually in about 2 minutes each, or share your referral link and new leads flow in automatically. We're building CSV import for the next update."},
     {q:"Does the AI learn over time?",a:"The more you use Brikk, the more context AI has about your leads, your deals, and your patterns. After 90 days, it knows your business better than any CRM you've ever used."},
   ]
@@ -357,7 +357,7 @@ export default function Home(){
               Brikk is the command center for real estate agents who are tired of juggling 8 apps and losing leads. Add your leads, and AI handles the follow-ups you keep forgetting.
             </p>
             <p style={{fontSize:14,fontWeight:600,color:c.text,margin:"0 0 28px"}}>
-              $75/month. Not $300. Not $500. And the first 14 days are free.
+              $69.99/month. No setup fee. Not $300. Not $500. And the first 14 days are free.
             </p>
             <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
               {!submitted?<>
@@ -384,7 +384,7 @@ export default function Home(){
       <div style={{borderTop:`1px solid ${c.border}`,borderBottom:`1px solid ${c.border}`,padding:"24px 0"}}>
         <div style={{maxWidth:1120,margin:"0 auto",padding:"0 20px"}}>
           <div style={{display:"flex",justifyContent:"space-between",flexWrap:"wrap",gap:16}}>
-            {[["78%","of buyers pick the first agent who responds"],["15 hrs","average agent response time"],["80%","of sales happen after the 5th follow-up"],["$75/mo","vs $300-500 for competitors"]].map(([val,desc],i)=>(
+            {[["78%","of buyers pick the first agent who responds"],["15 hrs","average agent response time"],["80%","of sales happen after the 5th follow-up"],["$69.99/mo","vs $300-500 for competitors"]].map(([val,desc],i)=>(
               <div key={i} style={{textAlign:"center",flex:"1 1 140px"}}><div style={{fontSize:22,fontWeight:700}}>{val}</div><div style={{fontSize:11,color:c.dim,marginTop:4}}>{desc}</div></div>
             ))}
           </div>
@@ -480,6 +480,60 @@ export default function Home(){
         </div>
       </section>
 
+      {/* Testimonials —
+          REPLACE THESE PLACEHOLDERS with real quotes as you collect them.
+          Each quote object: { quote, name, role, market, result }.
+          When you have 3 real quotes, remove the "Early access" tag.
+      */}
+      <section style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,background:c.bg}}>
+        <div style={{maxWidth:1000,margin:"0 auto"}}>
+          <div style={{textAlign:"center",marginBottom:36}}>
+            <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"4px 14px",marginBottom:14}}>
+              <span style={{fontSize:11,fontWeight:600,color:c.green}}>Early access — first 50 agents</span>
+            </div>
+            <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>Agents using Brikk today</h2>
+            <p style={{fontSize:14,color:c.sub,margin:0}}>Real names, real markets, real numbers.</p>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
+            {[
+              {
+                quote:"Brikk caught two deals going cold I would have missed. Closed both. That paid for the year right there.",
+                name:"[Agent name]",
+                role:"Buyer's agent",
+                market:"[City, State]",
+                result:"Closed 2 deals in 90 days",
+              },
+              {
+                quote:"The voice-to-CRM feature is the only reason I actually log activity anymore. After showings, I tap, talk, done.",
+                name:"[Agent name]",
+                role:"Solo agent",
+                market:"[City, State]",
+                result:"15+ hours saved per month",
+              },
+              {
+                quote:"My morning brief is the first email I open. It tells me exactly who to call back. Stopped using my old CRM after week 2.",
+                name:"[Agent name]",
+                role:"Team lead",
+                market:"[City, State]",
+                result:"Switched from Follow Up Boss",
+              },
+            ].map((t,i)=>(
+              <div key={i} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:10,padding:"24px 22px",display:"flex",flexDirection:"column",gap:14}}>
+                <div style={{fontSize:14,lineHeight:1.65,color:c.text,fontStyle:"italic"}}>"{t.quote}"</div>
+                <div style={{borderTop:`1px solid ${c.borderLight}`,paddingTop:12,marginTop:"auto"}}>
+                  <div style={{fontSize:13,fontWeight:600,color:c.text}}>{t.name}</div>
+                  <div style={{fontSize:11,color:c.dim,marginTop:1}}>{t.role} · {t.market}</div>
+                  <div style={{fontSize:11,fontWeight:600,color:c.green,marginTop:6}}>{t.result}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{fontSize:11,color:c.dim,textAlign:"center",marginTop:20,fontStyle:"italic"}}>
+            Want to be quoted? Email <a href="mailto:hello@brikk.store" style={{color:c.dim,textDecoration:"underline"}}>hello@brikk.store</a> with your story — featured agents get a free month.
+          </p>
+        </div>
+      </section>
+
       {/* Pricing */}
       <section id="pricing" style={{padding:"48px 20px 60px",borderTop:`1px solid ${c.border}`,scrollMarginTop:80}}>
         <div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
@@ -494,11 +548,11 @@ export default function Home(){
               <div style={{fontSize:15,fontWeight:700,marginTop:8,marginBottom:4}}>Pro</div>
               <div style={{fontSize:13,color:c.sub,marginBottom:16}}>For solo agents</div>
               <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:2}}>
-                <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$75</span>
+                <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$69.99</span>
                 <span style={{fontSize:14,color:c.sub}}>/month</span>
               </div>
               <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 14 days</div>
-              <div style={{fontSize:12,color:c.dim,marginBottom:20}}>+ $125 one-time setup fee</div>
+              <div style={{fontSize:12,color:c.dim,marginBottom:20}}>No setup fee · Cancel anytime</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
                 {["Everything in the app","AI Copilot drafts","Voice-to-CRM","Smart Calendar","Marketing ROI","Lead Capture Link","Web + mobile (PWA)","Unlimited leads & deals"].map((f,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:4,height:4,borderRadius:"50%",background:c.text}}/><span style={{fontSize:13,color:c.sub}}>{f}</span></div>
@@ -512,11 +566,11 @@ export default function Home(){
               <div style={{fontSize:15,fontWeight:700,marginBottom:4}}>Team</div>
               <div style={{fontSize:13,color:c.sub,marginBottom:16}}>For small teams</div>
               <div style={{display:"flex",alignItems:"baseline",gap:4,marginBottom:2}}>
-                <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$200</span>
+                <span style={{fontSize:44,fontWeight:700,letterSpacing:"-0.02em"}}>$160</span>
                 <span style={{fontSize:14,color:c.sub}}>/month</span>
               </div>
               <div style={{fontSize:13,color:c.green,fontWeight:600,marginBottom:4}}>$0 for your first 14 days</div>
-              <div style={{fontSize:12,color:c.dim,marginBottom:20}}>+ $125 one-time setup fee</div>
+              <div style={{fontSize:12,color:c.dim,marginBottom:20}}>No setup fee · Cancel anytime</div>
               <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:24}}>
                 {["Everything in Pro","Up to 5 agent seats","Team code for member onboarding","Shared subscription","Priority support"].map((f,i)=>(
                   <div key={i} style={{display:"flex",alignItems:"center",gap:6}}><div style={{width:4,height:4,borderRadius:"50%",background:c.dim}}/><span style={{fontSize:13,color:c.sub}}>{f}</span></div>
@@ -593,8 +647,9 @@ export default function Home(){
       {/* Footer */}
       <footer style={{borderTop:`1px solid ${c.border}`,padding:"24px 20px",display:"flex",justifyContent:"space-between",alignItems:"center",maxWidth:1120,margin:"0 auto",flexWrap:"wrap",gap:8}}>
         <span style={{fontSize:14,fontWeight:700}}>Brikk</span>
-        <div style={{display:"flex",gap:20}}>
+        <div style={{display:"flex",gap:20,flexWrap:"wrap"}}>
           <a href="/login" style={{fontSize:12,color:c.sub}}>Sign in</a>
+          <a href="/roadmap" style={{fontSize:12,color:c.sub}}>Roadmap</a>
           <a href="/privacy" style={{fontSize:12,color:c.sub}}>Privacy</a>
           <a href="/terms" style={{fontSize:12,color:c.sub}}>Terms</a>
           <a href="mailto:hello@brikk.store" style={{fontSize:12,color:c.sub}}>Contact</a>

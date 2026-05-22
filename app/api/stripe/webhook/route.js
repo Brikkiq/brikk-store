@@ -57,8 +57,9 @@ function resolvePlan(session, subscription) {
 
   // Fallback: infer from price (in dollars)
   const amount = subscription?.items?.data?.[0]?.price?.unit_amount
-  if (amount === 20000) return 'team'        // $200
-  if (amount === 7500) return 'pro'          // $75
+  // Match new pricing OR legacy fallback amounts.
+  if (amount === 16000 || amount === 20000) return 'team'   // $160 new, $200 legacy
+  if (amount === 6999  || amount === 7500)  return 'pro'    // $69.99 new, $75 legacy
   return null
 }
 
@@ -299,7 +300,7 @@ export async function POST(request) {
         const { data: { user } } = await supabase.auth.admin.getUserById(profile.id)
         if (user?.email) {
           const plan = subscription.metadata?.plan || 'pro'
-          const priceLabel = plan === 'team' ? '$200/month' : '$75/month'
+          const priceLabel = plan === 'team' ? '$160/month' : '$69.99/month'
           const trialEndDate = subscription.trial_end
             ? new Date(subscription.trial_end * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
             : 'in 3 days'
@@ -374,7 +375,7 @@ function buildTrialEndingHtml({ firstName, plan, priceLabel, trialEndDate }) {
               Your trial ends ${trialEndDate}, ${firstName}.
             </h1>
             <p style="font-size:14px;line-height:1.65;color:#1A1A18;margin:0 0 16px 0;">
-              Quick heads-up: your 14-day Brikk trial ends ${trialEndDate}. Your card on file will be charged <strong>${priceLabel}</strong> for the ${plan} plan, plus a one-time $125 setup fee, and your subscription will continue automatically.
+              Quick heads-up: your 14-day Brikk trial ends ${trialEndDate}. Your card on file will be charged <strong>${priceLabel}</strong> for the ${plan} plan and your subscription will continue automatically.
             </p>
             <p style="font-size:14px;line-height:1.65;color:#1A1A18;margin:0 0 20px 0;">
               If Brikk's been helping you close more deals, no action needed — we'll keep going. If you want to stop, you can cancel anytime before ${trialEndDate} from Settings → Billing.

@@ -356,6 +356,24 @@ const DraftCard = ({
         </div>
       )}
 
+      {draft.best_time_hint && !isEditing && (
+        <div style={{
+          background: 'rgba(22,128,60,0.06)',
+          border: `1px solid rgba(22,128,60,0.15)`,
+          padding: '8px 12px',
+          borderRadius: 4,
+          marginBottom: 14,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 8,
+        }}>
+          <span style={{ fontSize: 13 }}>⏰</span>
+          <div style={{ fontSize: 12.5, color: c.green, lineHeight: 1.55, fontWeight: 500 }}>
+            {draft.best_time_hint}
+          </div>
+        </div>
+      )}
+
       {!isEditing && !approved && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {leadPhone && (

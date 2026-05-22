@@ -2,7 +2,7 @@ import './globals.css'
 
 export const metadata = {
   title: 'Brikk — Built to Close',
-  description: 'The command center for real estate agents. AI-powered follow-ups, lead management, deal tracking. $75/month.',
+  description: 'The command center for real estate agents. AI-powered follow-ups, lead management, deal tracking. $69.99/month, no setup fee.',
   openGraph: {
     title: 'Brikk — Built to Close',
     description: 'The command center for real estate agents. One screen. Every deal. AI that acts.',

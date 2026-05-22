@@ -111,6 +111,41 @@ export default function AppOverview() {
     })
   })
 
+  // ---- Proactive intelligence: detect deals quietly going cold ----
+  // A deal is "going cold" if it hasn't been updated in 14+ days OR it's past
+  // its expected close date by more than 3 days without being marked Closed.
+  // These often slip through the cracks because nothing else flags them.
+  deals.forEach(d => {
+    if (d.stage === 'Closed') return
+    const daysSinceUpdate = fmt.daysSince(d.updated_at) ?? 0
+    const daysPastClose = d.close_date ? -fmt.daysUntil(d.close_date) : null
+    const isStalledByActivity = daysSinceUpdate >= 14
+    const isPastClose = daysPastClose !== null && daysPastClose > 3
+    // Skip if the deal will already be flagged by the closing-window logic above
+    const left = d.close_date ? fmt.daysUntil(d.close_date) : null
+    const alreadyFlagged = left !== null && left <= 14 && left >= -3
+    if (alreadyFlagged) return
+    if (!isStalledByActivity && !isPastClose) return
+    let subtitle
+    if (isPastClose) {
+      subtitle = `Past expected close date by ${daysPastClose} days — confirm status or push the date`
+    } else {
+      subtitle = `${daysSinceUpdate}d since any update — nudge before it slips`
+    }
+    actions.push({
+      id: `cold-deal-${d.id}`,
+      priority: 'medium',
+      category: 'Deal cooling',
+      title: d.address,
+      subtitle,
+      meta: [d.client_name, d.stage, d.price ? fmt.money(d.price) : null]
+        .filter(Boolean).join(' · '),
+      tone: 'warn',
+      secondaryHref: '/app/deals',
+      secondaryLabel: 'Open deal',
+    })
+  })
+
   const leadsNeedingFollowUp = leads.filter(l => {
     const d = fmt.daysSince(l.last_contact_date) ?? 999
     return (l.temperature === 'hot' && d >= 1) || (l.temperature === 'warm' && d >= 3) || (l.temperature === 'cold' && d >= 7)

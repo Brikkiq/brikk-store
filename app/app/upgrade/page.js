@@ -161,10 +161,10 @@ export default function UpgradePage() {
             <div style={{ ...type.meta, marginBottom: 12 }}>For solo agents</div>
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 12 }}>
-              <span style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.02em' }}>$75</span>
+              <span style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.02em' }}>$69.99</span>
               <span style={{ fontSize: 14, color: c.dim }}>/month</span>
             </div>
-            <div style={{ ...type.meta, marginBottom: 16 }}>+ $125 one-time setup</div>
+            <div style={{ ...type.meta, marginBottom: 16 }}>No setup fee · Cancel anytime</div>
 
             <ul style={{ ...type.bodySub, paddingLeft: 18, margin: 0, marginBottom: 18, lineHeight: 1.75, fontSize: 13 }}>
               <li>Everything in the app</li>
@@ -189,10 +189,10 @@ export default function UpgradePage() {
             <div style={{ ...type.meta, marginBottom: 12 }}>For small teams</div>
 
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 12 }}>
-              <span style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.02em' }}>$200</span>
+              <span style={{ fontSize: 38, fontWeight: 700, letterSpacing: '-0.02em' }}>$160</span>
               <span style={{ fontSize: 14, color: c.dim }}>/month</span>
             </div>
-            <div style={{ ...type.meta, marginBottom: 16 }}>Up to 5 agents · + $125 setup</div>
+            <div style={{ ...type.meta, marginBottom: 16 }}>Up to 5 agents · No setup fee</div>
 
             <ul style={{ ...type.bodySub, paddingLeft: 18, margin: 0, marginBottom: 18, lineHeight: 1.75, fontSize: 13 }}>
               <li>Everything in Pro</li>
@@ -226,7 +226,7 @@ export default function UpgradePage() {
         <div style={{ textAlign: 'center', marginTop: 36 }}>
           <div style={{ ...type.meta, marginBottom: 6 }}>Your data is safe. Subscribe and you're back where you left off in seconds.</div>
           <div style={{ ...type.meta, color: c.dim, marginBottom: 6, maxWidth: 560, marginLeft: 'auto', marginRight: 'auto', lineHeight: 1.5 }}>
-            <strong style={{ color: c.text }}>All sales are final. No refunds.</strong> Your 14-day free trial is the time to evaluate Brikk — once you subscribe, monthly fees and the $125 setup fee are non-refundable. You can cancel anytime to stop future charges. By subscribing you agree to our <a href="/terms" style={{ color: c.sub, textDecoration: 'underline' }}>Terms of Service</a>.
+            <strong style={{ color: c.text }}>All sales are final. No refunds.</strong> Your 14-day free trial is the time to evaluate Brikk — once you subscribe, monthly fees are non-refundable. You can cancel anytime to stop future charges. By subscribing you agree to our <a href="/terms" style={{ color: c.sub, textDecoration: 'underline' }}>Terms of Service</a>.
           </div>
           <a href="/app/settings" style={{ ...type.meta, color: c.dim }}>Settings · Privacy · Sign out</a>
         </div>
