@@ -263,6 +263,53 @@ Return ONLY the JSON.`,
     }
 
     // --- Landing-page help chat ---
+    // ---------- Sentiment analysis ----------
+    // Given a message body, classify the tone as warm / cool / frustrated / neutral.
+    // Used to auto-tag inbound messages so the agent knows when a relationship
+    // is cooling before reading the full thread.
+    if (body.mode === 'sentiment') {
+      const { text } = body
+      if (!text || String(text).trim().length < 3) {
+        return NextResponse.json({ sentiment: 'neutral' })
+      }
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': ANTHROPIC_KEY,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify({
+            model: 'claude-sonnet-4-5',
+            max_tokens: 30,
+            messages: [{
+              role: 'user',
+              content: `Classify this short message's tone from a real estate buyer/seller writing to their agent.
+
+Message: "${String(text).slice(0, 800)}"
+
+Return ONE word, lowercase, no punctuation, one of:
+warm        — engaged, positive, moving forward
+cool        — short, transactional, possibly disengaging
+frustrated  — irritated, complaints, confused, urgent
+neutral     — informational, no clear signal
+
+Reply with ONLY the single word.`
+            }],
+          }),
+        })
+        const data = await res.json()
+        const raw = (data.content?.[0]?.text || '').trim().toLowerCase()
+        const allowed = ['warm', 'cool', 'frustrated', 'neutral']
+        const sentiment = allowed.find(s => raw.startsWith(s)) || 'neutral'
+        return NextResponse.json({ sentiment })
+      } catch (err) {
+        console.error('sentiment classification failed:', err?.message)
+        return NextResponse.json({ sentiment: 'neutral' })
+      }
+    }
+
     if (body.mode === 'help_chat') {
       const { question } = body
       if (!question) return NextResponse.json({ answer: 'Ask me anything about Brikk.' })

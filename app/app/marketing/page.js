@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
-import { c, type, card, statTile, fmt } from '@/lib/design'
+import { c, type, card, statTile, btn, input, fmt } from '@/lib/design'
 
 const sourceColors = {
   Zillow: '#3730A3',
@@ -18,20 +18,38 @@ const sourceColors = {
 export default function MarketingPage() {
   const [leads, setLeads] = useState([])
   const [deals, setDeals] = useState([])
+  const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [editingGoal, setEditingGoal] = useState(false)
+  const [goalInput, setGoalInput] = useState('')
 
   useEffect(() => { loadData() }, [])
 
   const loadData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
-    const [leadsRes, dealsRes] = await Promise.all([
+    const [leadsRes, dealsRes, profileRes] = await Promise.all([
       supabase.from('leads').select('*').eq('user_id', user.id),
       supabase.from('deals').select('*').eq('user_id', user.id),
+      supabase.from('profiles').select('*').eq('id', user.id).maybeSingle(),
     ])
     setLeads(leadsRes.data || [])
     setDeals(dealsRes.data || [])
+    setProfile(profileRes.data || null)
     setLoading(false)
+  }
+
+  const saveGoal = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const goalNum = parseFloat(goalInput)
+    if (!goalNum || goalNum < 0) return
+    await supabase.from('profiles').update({
+      annual_commission_goal: goalNum,
+      goal_year: new Date().getFullYear(),
+    }).eq('id', user.id)
+    setEditingGoal(false)
+    loadData()
   }
 
   // --- Source metrics ---
@@ -73,6 +91,18 @@ export default function MarketingPage() {
         <h1 style={{ ...type.pageTitle, margin: 0 }}>Marketing</h1>
         <p style={{ ...type.bodySub, margin: '4px 0 0' }}>See which sources actually produce closings — not just leads.</p>
       </div>
+
+      {/* Commission goal pacing — only shown when goal is set */}
+      <CommissionGoalCard
+        profile={profile}
+        leads={leads}
+        deals={deals}
+        editing={editingGoal}
+        setEditing={setEditingGoal}
+        goalInput={goalInput}
+        setGoalInput={setGoalInput}
+        onSave={saveGoal}
+      />
 
       {/* KPIs */}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 24 }}>
@@ -210,6 +240,137 @@ export default function MarketingPage() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// Commission goal pacing card — shows progress toward annual target and tells
+// the agent how many leads they need to work to hit it at their current
+// conversion rate. Sits at the top of the Marketing page.
+const CommissionGoalCard = ({ profile, leads, deals, editing, setEditing, goalInput, setGoalInput, onSave }) => {
+  const goal = Number(profile?.annual_commission_goal) || 0
+
+  if (!goal && !editing) {
+    return (
+      <div style={{
+        background: c.white, border: `1px dashed ${c.border}`,
+        borderRadius: 8, padding: '16px 20px',
+        marginBottom: 18,
+        display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap',
+      }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600 }}>Set an annual commission goal</div>
+          <div style={{ ...type.meta, marginTop: 2 }}>Track pacing against your target so you know if you need to work more leads.</div>
+        </div>
+        <button onClick={() => { setGoalInput(''); setEditing(true) }} style={{ fontSize: 13, fontWeight: 600, color: c.text, background: c.bg, border: `1px solid ${c.border}`, borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+          Set goal
+        </button>
+      </div>
+    )
+  }
+
+  if (editing) {
+    return (
+      <div style={{ ...card, marginBottom: 18 }}>
+        <div style={{ ...type.eyebrow, marginBottom: 8 }}>Annual commission goal ({new Date().getFullYear()})</div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="number"
+            value={goalInput}
+            onChange={e => setGoalInput(e.target.value)}
+            placeholder="100000"
+            style={{ ...input, maxWidth: 200 }}
+            autoFocus
+          />
+          <button onClick={onSave} style={btn.primary}>Save</button>
+          <button onClick={() => setEditing(false)} style={btn.ghost}>Cancel</button>
+        </div>
+      </div>
+    )
+  }
+
+  // Goal is set — calculate pacing
+  const yearStart = new Date(new Date().getFullYear(), 0, 1)
+  const yearEnd = new Date(new Date().getFullYear(), 11, 31)
+  const totalDaysInYear = Math.round((yearEnd - yearStart) / 86400000)
+  const daysPassed = Math.max(1, Math.round((new Date() - yearStart) / 86400000))
+  const yearFraction = daysPassed / totalDaysInYear
+  const expectedToHere = goal * yearFraction
+  const earned = deals
+    .filter(d => d.stage === 'Closed' && d.commission > 0 && new Date(d.close_date || d.updated_at).getFullYear() === new Date().getFullYear())
+    .reduce((sum, d) => sum + Number(d.commission), 0)
+  const pendingCommission = deals
+    .filter(d => d.stage !== 'Closed' && d.commission > 0)
+    .reduce((sum, d) => sum + Number(d.commission), 0)
+  const remaining = Math.max(0, goal - earned - pendingCommission)
+  const pacingPct = goal > 0 ? Math.min(100, (earned / goal) * 100) : 0
+  const conversionRate = Number(profile?.conversion_rate_estimate) || 0.15
+  const avgCommission = deals.filter(d => d.commission > 0).length > 0
+    ? deals.reduce((s, d) => s + (d.commission || 0), 0) / deals.filter(d => d.commission > 0).length
+    : 8000
+  const leadsNeeded = Math.ceil(remaining / (avgCommission * conversionRate))
+
+  const onPace = earned >= expectedToHere
+  const accentColor = onPace ? c.green : c.amber
+
+  return (
+    <div style={{ ...card, marginBottom: 18 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ ...type.eyebrow, marginBottom: 4 }}>Annual commission pacing</div>
+          <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: '-0.015em' }}>
+            {fmt.money(earned)} <span style={{ fontSize: 14, color: c.dim, fontWeight: 400 }}>of {fmt.money(goal)}</span>
+          </div>
+          <div style={{ fontSize: 12.5, color: accentColor, fontWeight: 500, marginTop: 4 }}>
+            {onPace
+              ? `On pace — you should be at ${fmt.money(Math.round(expectedToHere))} by now`
+              : `Behind pace — should be at ${fmt.money(Math.round(expectedToHere))} by now (${fmt.money(Math.round(expectedToHere - earned))} short)`}
+          </div>
+        </div>
+        <button onClick={() => { setGoalInput(goal.toString()); setEditing(true) }} style={{ ...btn.ghost, fontSize: 12 }}>Edit goal</button>
+      </div>
+
+      {/* Progress bar */}
+      <div style={{ marginTop: 14, marginBottom: 14 }}>
+        <div style={{ background: c.borderLight, borderRadius: 4, height: 8, overflow: 'hidden', position: 'relative' }}>
+          <div style={{
+            width: `${pacingPct}%`, height: '100%',
+            background: accentColor, borderRadius: 4,
+            transition: 'width 0.4s ease',
+          }} />
+          {/* Expected-pace marker */}
+          <div style={{
+            position: 'absolute', top: -3, bottom: -3,
+            left: `${Math.min(100, yearFraction * 100)}%`,
+            width: 2, background: c.dim,
+            borderRadius: 1,
+          }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4, ...type.meta }}>
+          <span>$0</span>
+          <span>Today: {(yearFraction * 100).toFixed(0)}%</span>
+          <span>{fmt.money(goal)}</span>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10, fontSize: 12.5, color: c.sub }}>
+        <div>
+          <div style={{ fontWeight: 600, color: c.text, fontSize: 13 }}>{fmt.money(pendingCommission)}</div>
+          <div style={{ color: c.dim }}>In pending deals</div>
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, color: c.text, fontSize: 13 }}>{fmt.money(remaining)}</div>
+          <div style={{ color: c.dim }}>Still needed</div>
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, color: c.text, fontSize: 13 }}>~{leadsNeeded} leads</div>
+          <div style={{ color: c.dim }}>To close at {(conversionRate * 100).toFixed(0)}% rate</div>
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, color: c.text, fontSize: 13 }}>{fmt.money(Math.round(avgCommission))}</div>
+          <div style={{ color: c.dim }}>Avg commission</div>
+        </div>
+      </div>
     </div>
   )
 }

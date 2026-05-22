@@ -164,6 +164,68 @@ export default function AppOverview() {
     })
   }
 
+  // ---- Deal risk scoring ----
+  // Heuristic flag for transactions that statistically fall apart:
+  // - First-time buyer (heuristic: source includes "first-time" or notes mention "first time")
+  // - Long close window (>45 days out gives more time for things to go sideways)
+  // - Stalled mid-pipeline (Inspection/Appraisal/Financing for 10+ days)
+  // These don't have to be perfect — they just flag attention before agents lose deals.
+  deals.forEach(d => {
+    if (d.stage === 'Closed' || d.stage === 'Contract') return
+    const riskFactors = []
+    const left = d.close_date ? fmt.daysUntil(d.close_date) : null
+    if (left !== null && left > 45) riskFactors.push('long close window (' + left + 'd)')
+    const daysInStage = fmt.daysSince(d.updated_at) ?? 0
+    if (['Inspection', 'Appraisal', 'Financing'].includes(d.stage) && daysInStage >= 10) {
+      riskFactors.push(`${daysInStage}d stalled at ${d.stage}`)
+    }
+    const notes = (d.notes || '').toLowerCase()
+    if (notes.includes('first-time') || notes.includes('first time')) {
+      riskFactors.push('first-time buyer')
+    }
+    if (riskFactors.length < 2) return  // only surface if at least 2 risk factors
+    actions.push({
+      id: `risk-deal-${d.id}`,
+      priority: 'medium',
+      category: 'Deal at risk',
+      title: d.address,
+      subtitle: `Risk signals: ${riskFactors.join(', ')} — check in proactively before something cracks`,
+      meta: [d.client_name, d.stage, d.price ? fmt.money(d.price) : null].filter(Boolean).join(' · '),
+      tone: 'warn',
+      secondaryHref: '/app/deals',
+      secondaryLabel: 'Open deal',
+    })
+  })
+
+  // ---- Home anniversary reminders ----
+  // For closed deals, surface the closing anniversary (1-year, 2-year, etc.)
+  // High-touch low-effort relationship glue. Most CRMs abandon this entirely.
+  const todayDate = new Date()
+  deals.forEach(d => {
+    if (d.stage !== 'Closed' || !d.close_date) return
+    const closeD = new Date(d.close_date)
+    const yearsSince = todayDate.getFullYear() - closeD.getFullYear()
+    if (yearsSince < 1) return
+    // Same month + day = anniversary; also surface +/- 3 days for grace
+    const monthMatch = todayDate.getMonth() === closeD.getMonth()
+    const dayDiff = Math.abs(todayDate.getDate() - closeD.getDate())
+    if (!monthMatch || dayDiff > 3) return
+    const draftText = `Hi ${(d.client_name || '').split(' ')[0] || 'there'}, can't believe it's been ${yearsSince} year${yearsSince === 1 ? '' : 's'} since you moved into ${d.address}! Hope it still feels like home. Let me know if I can ever help with anything — referrals, market updates, you name it.`
+    actions.push({
+      id: `anniversary-${d.id}`,
+      priority: 'medium',
+      category: 'Anniversary',
+      title: `🏡 ${d.client_name || d.address} — ${yearsSince} year${yearsSince === 1 ? '' : 's'} in their home`,
+      subtitle: `Reach out today — high-impact relationship moment, almost no agent does this.`,
+      meta: d.address,
+      tone: 'info',
+      primaryLabel: 'Send anniversary message',
+      primaryHref: `sms:?&body=${encodeURIComponent(draftText)}`,
+      secondaryHref: '/app/deals',
+      secondaryLabel: 'Open deal',
+    })
+  })
+
   // Birthday alerts — surface today + next 7 days as action cards.
   // Touching a client's birthday is one of the highest-ROI moments an agent
   // can engineer; missing it is the most damaging.

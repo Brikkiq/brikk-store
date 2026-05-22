@@ -138,6 +138,19 @@ export default function MessagesPage() {
     if (!replyText.trim() || !selectedLead) return
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
+    // Score sentiment via Anthropic. Fire-and-forget — we don't block the logging
+    // if classification fails. Falls back to neutral.
+    let sentiment = 'neutral'
+    try {
+      const sentRes = await fetch('/api/copilot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'sentiment', text: replyText.trim() }),
+      })
+      const sentData = await sentRes.json()
+      if (sentData?.sentiment) sentiment = sentData.sentiment
+    } catch { /* fallback to neutral */ }
+
     await supabase.from('messages').insert({
       user_id: user.id,
       lead_id: selectedLead.id,
@@ -145,6 +158,7 @@ export default function MessagesPage() {
       channel: 'text',
       content: replyText.trim(),
       status: 'logged',
+      sentiment,
     })
     await supabase.from('leads').update({
       last_contact_date: new Date().toISOString(),

@@ -212,11 +212,47 @@ const DealCard = ({ deal, onEdit, onDelete, onStage }) => {
           {deal.notes}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-        <button onClick={onEdit} style={btn.secondary}>Edit</button>
-        <button onClick={onDelete} style={btn.ghost}>Delete</button>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+        <ShareTrackerLink deal={deal} />
+        <div style={{ display: 'flex', gap: 6 }}>
+          <button onClick={onEdit} style={btn.secondary}>Edit</button>
+          <button onClick={onDelete} style={btn.ghost}>Delete</button>
+        </div>
       </div>
     </div>
+  )
+}
+
+// Client-facing tracker link share button. Copies the public URL to the clipboard.
+const ShareTrackerLink = ({ deal }) => {
+  const [copied, setCopied] = useState(false)
+  if (!deal.client_token) {
+    return <span style={{ ...type.meta, color: c.dim }}>Tracker link unavailable — run v2 schema migration</span>
+  }
+  const url = `${typeof window !== 'undefined' ? window.location.origin : 'https://brikk.store'}/track/${deal.client_token}`
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      if (window.brikk?.haptic) window.brikk.haptic('success')
+      setTimeout(() => setCopied(false), 2200)
+    } catch {
+      // Fallback for old browsers
+      prompt('Copy this link:', url)
+    }
+  }
+  return (
+    <button onClick={copy} style={{
+      ...btn.ghost,
+      fontSize: 12,
+      color: copied ? c.green : c.sub,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: 6,
+    }}>
+      <span style={{ fontSize: 14 }}>{copied ? '✓' : '🔗'}</span>
+      {copied ? 'Copied — share with client' : 'Share tracker link with client'}
+    </button>
   )
 }
 
