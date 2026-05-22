@@ -2,7 +2,15 @@
 
 Paste this entire document into a fresh Claude in Chrome session (or Claude Code session) with **write access to the brikk-store repo**. The bot will work through it autonomously over several hours, committing as it goes.
 
-Tell the bot at the start: **"You have full write access to the brikk-store repo. Work continuously through this spec without asking permission for non-destructive changes. Commit after each completed phase with a clear message. If you hit an actual ambiguity, leave a TODO comment and continue rather than blocking. Goal: ship as much as possible before Henry wakes up."**
+Tell the bot at the start: **"You have full write access to the brikk-store repo. Maximum autonomy — work continuously without asking permission for any non-destructive change. Make decisions on ambiguity, document them in TODO comments, and keep moving. Never block on permission. Commit constantly. Goal: ship as much as possible before Henry wakes up. DO NOT use, read, or store any of Henry's personal passwords, API secret values, or credentials — leave them as env var placeholders with `process.env.X` and document what Henry needs to set. Secrets are Henry's job, code is yours."**
+
+## Operating mode
+
+- **No permission gates.** Don't ask "should I proceed?" — proceed. Document decisions you made in commit messages.
+- **No blocking on ambiguity.** Pick the most reasonable interpretation, leave a `// TODO(henry-review):` comment explaining your call.
+- **Commit every 20-30 minutes** even mid-feature. Small commits with clear messages > one giant final commit.
+- **Skip work that requires real credentials.** Anywhere the code would need a real API key, secret, password, or token, use `process.env.VARIABLE_NAME` and document the variable name + how Henry obtains the value in the relevant `docs/*.md` file. Never put real values anywhere.
+- **Push to GitHub frequently.** At minimum after each completed phase. Henry wants to see progress when he wakes up.
 
 ---
 
@@ -248,8 +256,192 @@ Keep that report under 400 words. Henry reads it first thing tomorrow morning.
 
 ---
 
+---
+
+# PART TWO: Pitch deck
+
+After Google Calendar sync ships (or if you finish early), build a complete investor / brokerage-sales pitch deck for Brikk. Save as `pitch/brikk-pitch-deck.md` so Henry can convert to PDF or slides tomorrow.
+
+The deck has to be detailed, accurate, and ready to send to investors or brokerage partners. No fluff, no generic startup language.
+
+## Required sections (in this order)
+
+### 1. Title + one-line value proposition
+- "Brikk — the AI transaction coordinator in your pocket for solo real estate agents"
+- One-sentence pitch
+- Founder name (Henry Desrosier), location (Southern California), launch date
+
+### 2. The problem (2 slides)
+- Solo agents pay $300-500/month for legacy CRMs (Lofty, Follow Up Boss, KvCore, Real Geeks) and still need a transaction coordinator at $300-400/deal
+- Most agents lose 30-40% of leads to slow response time (cite the WAV Group 15hr response stat)
+- The market is consolidating around big brokerages with full-stack tech — solo agents are getting squeezed
+
+### 3. The solution
+- Brikk = AI CRM + AI transaction coordinator + AI lead capture + AI marketing analytics in one product
+- $69.99/month (vs $300-500 for competitors)
+- Voice-to-CRM, AI follow-up drafts, smart calendar, sentiment analysis, deal risk scoring, anniversary reminders, referral tracking, hyperlocal market reports
+- Built for solo agents but scales to teams via Team plan
+
+### 4. Product overview — feature inventory
+Pull from `app/roadmap/page.js` (shipped section). For each feature:
+- Name
+- One-sentence description
+- Why it matters (which time-suck or revenue-loss it kills)
+- How it gets smarter over time (see section 5)
+
+Group features:
+- **Pipeline & lead management:** Lead pipeline, capture link, CSV import, sources analytics
+- **AI Copilot:** Drafts, best-time-to-contact, sentiment, reply-with-AI, parse-chat-history
+- **Voice-to-CRM:** Multi-action voice notes parsed into structured updates
+- **Transaction coordination:** Deal tracker, public client tracker link, risk scoring, cold deal detection, listing prep checklist
+- **Relationship glue:** Birthdays, anniversaries, referral ledger, morning briefing email
+- **Marketing & analytics:** Source ROI, commission goal pacing, AI insights
+- **Calendar:** Smart calendar, Google sync (if shipped tonight)
+
+### 5. The "AI gets smarter" story — compounding intelligence
+Explain how Brikk's AI improves with use, per agent:
+- Day 1: writes generic-but-decent drafts
+- Day 30: knows the agent's voice from approved/edited drafts
+- Day 60: knows each lead's response patterns (best time to text, preferred channel)
+- Day 90: predicts which leads will close based on the agent's historical conversion patterns
+- Day 180: drafts feel indistinguishable from the agent's writing
+
+Frame as a **data moat that doesn't transfer to competitors** — switching cost grows monthly.
+
+### 6. API + infrastructure cost analysis
+
+Honest unit economics per active user per month. Include actual current API pricing as of May 2026:
+
+**Per-user monthly cost breakdown:**
+- **Supabase** (database, auth, realtime): ~$0.50/user at scale (Pro plan amortized)
+- **Anthropic Claude Sonnet 4.5** (Copilot drafts, sentiment, summaries, voice extract): ~$3.00/user — biggest variable cost
+  - Roughly: 25 drafts/mo at 600 input + 250 output tokens = 22k tokens. At $3/M input + $15/M output = $0.07/draft. Sentiment classification at 200 tokens × 30 inbounds = $0.005/mo. Voice extract heavier. Total: $2-4/user.
+- **Resend** (transactional email): ~$0.10/user (10k sends free, then $1/10k after)
+- **Stripe** (payment processing): 2.9% + $0.30 per transaction = ~$2.30/user/mo on $69.99
+- **Vercel** (hosting): ~$0.10/user at scale
+- **DNS, monitoring, misc**: ~$0.20/user
+
+Total variable cost: **~$6.20/user/month**. Gross margin at $69.99: **91%**.
+
+Compare favorably to:
+- Lofty: $449/mo with claimed 30% gross margin
+- Follow Up Boss: $99-499/mo with claimed 70% margin
+
+### 7. Expected returns model (Year 1)
+
+**Conservative scenario:**
+- Month 1-3: door-knock + organic = 25 paying customers
+- Month 4-6: referrals + content = 75 customers (3x growth)
+- Month 7-9: word-of-mouth compounds = 200 customers
+- Month 10-12: 400 customers
+- Year 1 ARR: ~$280k recurring at end of year ($69.99 × 400 × 12)
+- Year 1 total revenue: ~$130k actual (ramp-up curve)
+
+**Aggressive scenario:**
+- Month 12: 1000 customers, $830k ARR
+
+**Unit economics:**
+- CAC (customer acquisition cost): $50 in year 1 (mostly organic + referral)
+- LTV (12-month average subscription): ~$840
+- LTV/CAC ratio: 16:1 (excellent SaaS metric)
+- Payback period: <1 month
+- Gross margin: 91%
+
+**By year 3 (aggressive but plausible):**
+- 5000 paying customers
+- $4.2M ARR
+- Add Team/Agency plans at $160-custom: +30% blended ARPU
+- Add 1-2 brokerage partnerships at 100+ seats: floor revenue
+
+### 8. Competitive comparison — feature matrix
+
+Build a comparison table. Brikk vs:
+- **Lofty (formerly Chime):** $449/mo, large brokerage focus, complex onboarding
+- **Follow Up Boss:** $99-499/mo, established but no native AI, no voice
+- **KvCore:** $399/mo, IDX-focused, dated UI
+- **Real Geeks:** $299/mo, lead-gen-focused
+- **LionDesk:** $39/mo (cheap competitor) — but limited features
+
+For each, list 8-12 dimensions:
+- Monthly price
+- Setup fee
+- Onboarding time
+- AI follow-up drafts
+- Voice-to-CRM
+- Sentiment analysis
+- Client-facing deal tracker
+- Birthday/anniversary automation
+- Referral ledger
+- Lead capture link
+- Mobile app
+- Google Calendar sync
+
+Show Brikk as the only product with all of these at <$100/mo.
+
+### 9. Go-to-market strategy
+- **Phase 1 (months 1-3):** Henry's network — door-knock 50 local agencies in Southern California. Lead capture link is the trojan horse.
+- **Phase 2 (months 4-6):** Referrals + Instagram content. Every paying agent gets a referral link with a free month for both sides.
+- **Phase 3 (months 7-12):** Content marketing — blog posts on Reddit r/realestate, YouTube tutorials, partnerships with real estate coaches.
+- **Phase 4 (year 2):** Brokerage sales — pitch the Team/Agency plan to mid-size brokerages.
+
+### 10. The moat (why this can't just be cloned)
+- **Data moat:** Each agent's AI gets smarter with their use — switching costs compound. Section 5 details this.
+- **Compound features:** Birthday reminders + anniversary automation + referral ledger together = relationship loyalty. Each individually is small; together they create habits.
+- **Pricing moat:** 91% margin at $69.99 means competitors at $300+ can't match price without rebuilding their cost structure.
+- **Voice-to-CRM moat:** Most CRMs have NO voice interface. This is the killer feature for agents who are constantly in the car.
+
+### 11. The team / founder slide
+- Founder bio (Henry Desrosier)
+- Why now (AI infrastructure is finally cheap enough)
+- Why you (real-estate-adjacent context, building for self originally)
+
+### 12. The ask
+- If pitching investors: $X seed round at $Y valuation, runway to Z customers
+- If pitching brokerages: deal terms (per-seat pricing, white-label option, revenue share)
+- If pitching partnerships: specifically what integration / data flow
+
+Leave this as a placeholder for Henry to fill in based on context.
+
+### 13. Risks + mitigations
+Be honest. Real risks include:
+- **Apple/Google could clone:** mitigation = move fast, build relationships before they care
+- **A big competitor could match price:** mitigation = network effects via referral marketplace
+- **TCPA/legal liability:** mitigation = native phone sending pattern, not server SMS
+- **AI cost spike:** mitigation = own the prompt-engineering, switch models freely
+
+### 14. Closing slide
+- Demo URL (brikk.store)
+- Contact (hello@brikk.store)
+- "Built by realtors, for realtors."
+
+## Format
+
+Write `pitch/brikk-pitch-deck.md` as a polished markdown document. Henry can render to PDF via pandoc or copy-paste into Google Slides / Pitch / Beautiful.ai.
+
+Include:
+- Real numbers (not placeholders) for API costs, drawn from current Anthropic / Supabase / Stripe pricing pages
+- Real customer-facing language (no startup speak like "10x" or "synergize")
+- Specific feature lists, not vague "AI-powered" claims
+- Comparison data that's actually accurate (research current competitor pricing)
+
+Target length: ~3000 words / would be 14-18 slides if formatted visually.
+
+---
+
 ## Start now
 
-The above is a complete spec. Begin with section 1 (schema) and work down. Commit after each section. Don't ask permission for non-destructive changes. If you hit something genuinely ambiguous, leave a TODO and move on.
+The above is a complete spec. Two parts:
 
-You have until ~7am to ship as much as possible. Go.
+1. **PART ONE: Google Calendar sync** — sections 1-11 above. Begin with the schema migration. Commit after each section. Estimated 4.5-5.5 hours.
+
+2. **PART TWO: Pitch deck** — only after PART ONE is shipped (or if you stall on PART ONE for any reason >30 min, switch to PART TWO so Henry still has a deliverable). Estimated 60-90 min for a thorough deck.
+
+Don't ask permission for non-destructive changes. If you hit something genuinely ambiguous, leave a TODO and move on. Push commits every 20-30 minutes.
+
+Final deliverables when you stop:
+
+1. Google Calendar integration shipped to whatever phase you completed (per-phase commits in repo)
+2. `pitch/brikk-pitch-deck.md` complete
+3. `OVERNIGHT-BOT-REPORT.md` summarizing what's done, what's partial, what's outstanding, and what Henry needs to configure (env vars, OAuth registration, etc.)
+
+Henry has until ~7am. Ship as much as possible. Go.
