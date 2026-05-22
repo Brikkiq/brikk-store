@@ -67,6 +67,7 @@ export default function DealsPage() {
       lead_id: form.lead_id || null,
       user_id: user.id,
     }
+    let savedDealId = editId
     try {
       if (editId) {
         const { user_id, ...rest } = payload
@@ -75,13 +76,31 @@ export default function DealsPage() {
         }).eq('id', editId)
         showToast('Deal updated')
       } else {
-        await supabase.from('deals').insert(payload)
+        const { data: inserted } = await supabase
+          .from('deals')
+          .insert(payload)
+          .select('id')
+          .single()
+        savedDealId = inserted?.id
         showToast('Deal added')
       }
       if (window.brikk?.haptic) window.brikk.haptic('success')
     } catch {
       showToast('Something went wrong', 'error')
     }
+
+    // Fire-and-forget Google Calendar sync for closing date + anniversary
+    if (savedDealId) {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        fetch('/api/integrations/google/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ type: 'deal', id: savedDealId }),
+        }).catch(() => {})
+      }
+    }
+
     setSaving(false)
     setForm(emptyForm)
     setShowForm(false)

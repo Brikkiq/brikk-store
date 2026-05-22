@@ -5,13 +5,14 @@ import { supabase } from '@/lib/supabase'
 import { c, type, card, btn, input, inputLabel } from '@/lib/design'
 
 const TABS = [
-  { id: 'profile',    label: 'Profile' },
-  { id: 'team',       label: 'Team' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'billing',    label: 'Billing' },
-  { id: 'referral',   label: 'Lead capture link' },
-  { id: 'privacy',    label: 'Privacy' },
-  { id: 'agreement',  label: 'Legal' },
+  { id: 'profile',      label: 'Profile' },
+  { id: 'team',         label: 'Team' },
+  { id: 'appearance',   label: 'Appearance' },
+  { id: 'billing',      label: 'Billing' },
+  { id: 'integrations', label: 'Integrations' },
+  { id: 'referral',     label: 'Lead capture link' },
+  { id: 'privacy',      label: 'Privacy' },
+  { id: 'agreement',    label: 'Legal' },
 ]
 
 export default function SettingsPage() {
@@ -382,6 +383,7 @@ export default function SettingsPage() {
           {activeTab === 'team' && <TeamTab user={user} showToast={showToast} />}
 
           {activeTab === 'billing' && <BillingTab user={user} profile={profile} saving={saving} setSaving={setSaving} showToast={showToast} />}
+          {activeTab === 'integrations' && <IntegrationsTab showToast={showToast} />}
           {activeTab === 'referral' && <ReferralTab referralLink={referralLink} referralCode={referralCode} showToast={showToast} />}
           {activeTab === 'privacy' && <PrivacyTab />}
           {activeTab === 'agreement' && <AgreementTab />}
@@ -1068,6 +1070,233 @@ const TeamTab = ({ user, showToast }) => {
       </div>
       <button onClick={handleLeave} style={btn.danger} disabled={busy}>Leave team</button>
     </Section>
+  )
+}
+
+// IntegrationsTab — manage external service connections (Google Calendar today,
+// Microsoft Calendar / Slack / etc. in future). Each integration is its own card.
+const IntegrationsTab = ({ showToast }) => {
+  const [status, setStatus] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => { loadStatus() }, [])
+
+  // Re-check on focus, since the user may have come back from OAuth
+  useEffect(() => {
+    const onFocus = () => loadStatus()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
+
+  const loadStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      if (!token) { setLoading(false); return }
+      const res = await fetch('/api/integrations/google/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      setStatus(data)
+    } catch (err) {
+      console.error('Failed to load integration status:', err)
+    }
+    setLoading(false)
+  }
+
+  const handleConnect = async () => {
+    // The OAuth route reads the cookie token, so we just navigate.
+    // Pass the auth header via a server-side cookie is the cleanest path;
+    // for now we fall back to passing as a URL parameter or rely on the
+    // existing Supabase auth cookie. The /start route handles both.
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) {
+      showToast('Sign in expired — refresh and try again', 'error')
+      return
+    }
+    // Open the start URL with auth header — we do this via redirect after
+    // we set a temporary cookie. Simpler: pass token as Authorization on
+    // a fetch and follow the Location. Since browsers won't honor that on
+    // top-level navigation, easiest is to make /start cookie-aware OR
+    // do this:
+    window.location.href = `/api/integrations/google/start?access_token=${encodeURIComponent(session.access_token)}`
+  }
+
+  const handleDisconnect = async () => {
+    if (!confirm('Disconnect Google Calendar? Events Brikk created in your calendar will stay; future Brikk events won\'t sync.')) return
+    setBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      await fetch('/api/integrations/google/disconnect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      showToast('Google Calendar disconnected')
+      loadStatus()
+    } catch {
+      showToast('Disconnect failed', 'error')
+    }
+    setBusy(false)
+  }
+
+  const updateSettings = async (key, value) => {
+    if (!status?.connected) return
+    setBusy(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const newSettings = { ...(status.sync_settings || {}), [key]: value }
+      const res = await fetch('/api/integrations/google/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ sync_settings: newSettings }),
+      })
+      const data = await res.json()
+      if (data.sync_settings) {
+        setStatus({ ...status, sync_settings: data.sync_settings })
+      }
+    } catch {
+      showToast('Failed to update settings', 'error')
+    }
+    setBusy(false)
+  }
+
+  if (loading) {
+    return <Section title="Integrations"><div style={{ ...type.bodySub }}>Loading…</div></Section>
+  }
+
+  // Show the result banner from a recent OAuth callback
+  const oauthMessage = (() => {
+    if (typeof window === 'undefined') return null
+    const params = new URLSearchParams(window.location.search)
+    const status = params.get('google')
+    const messages = {
+      connected: 'Google Calendar connected.',
+      denied: 'Google access was denied. You can try again any time.',
+      bad_state: 'Connection security check failed. Please try again.',
+      token_exchange_failed: 'Google rejected our token exchange. Try connecting again.',
+      not_configured: 'Google integration is not configured by the admin.',
+      server_error: 'Server error during connection. Try again later.',
+      encryption_failed: 'Token storage failed — server configuration issue.',
+      db_error: 'Could not save integration. Try again.',
+    }
+    if (status && messages[status]) {
+      return { status, message: messages[status] }
+    }
+    return null
+  })()
+
+  return (
+    <>
+      <Section title="Connected accounts" description="Sync Brikk events to your calendar and other tools you already use.">
+        {oauthMessage && (
+          <div style={{
+            background: oauthMessage.status === 'connected' ? c.greenSoft : c.amberSoft,
+            border: `1px solid ${oauthMessage.status === 'connected' ? c.greenBorder : c.amberBorder || c.border}`,
+            color: oauthMessage.status === 'connected' ? c.green : c.amber,
+            borderRadius: 6, padding: '10px 14px', marginBottom: 14,
+            fontSize: 13, fontWeight: 500,
+          }}>
+            {oauthMessage.message}
+          </div>
+        )}
+
+        {/* Google Calendar card */}
+        <div style={{
+          ...card,
+          padding: '20px 22px',
+          display: 'flex', flexDirection: 'column', gap: 14,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 22 }}>📅</span>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600 }}>Google Calendar</div>
+                  <div style={{ ...type.bodySub, fontSize: 12.5, marginTop: 2 }}>
+                    Sync birthdays, anniversaries, follow-ups, and deal milestones to your Google Calendar. Changes flow both ways.
+                  </div>
+                </div>
+              </div>
+            </div>
+            {status?.connected ? (
+              <button onClick={handleDisconnect} disabled={busy} style={{ ...btn.secondary, color: c.red, borderColor: 'rgba(190,18,60,0.2)' }}>
+                {busy ? 'Working…' : 'Disconnect'}
+              </button>
+            ) : (
+              <button onClick={handleConnect} disabled={busy} style={btn.primary}>
+                {busy ? 'Working…' : 'Connect Google Calendar'}
+              </button>
+            )}
+          </div>
+
+          {status?.connected && (
+            <>
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${c.borderLight}`, fontSize: 12.5 }}>
+                <div style={{ color: c.sub }}>
+                  Connected as <strong style={{ color: c.text }}>{status.account_email || 'your Google account'}</strong>
+                </div>
+                <div style={{ color: c.dim, marginTop: 2 }}>
+                  {status.last_synced_at
+                    ? `Last sync: ${new Date(status.last_synced_at).toLocaleString()}`
+                    : 'Not yet synced — first sync runs within 15 minutes'}
+                </div>
+              </div>
+              <div style={{ paddingTop: 12, borderTop: `1px solid ${c.borderLight}` }}>
+                <div style={{ ...type.eyebrow, marginBottom: 10 }}>What to sync</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[
+                    ['birthdays',       'Birthdays',       'Recurring annual reminder for each lead\'s birthday'],
+                    ['anniversaries',   'Home anniversaries', 'Recurring reminder for closed clients on their move-in date'],
+                    ['follow_ups',      'Follow-ups',      'One-time events for AI-suggested follow-up times'],
+                    ['deal_milestones', 'Deal milestones', 'Closing dates, inspection deadlines, appraisal dates'],
+                  ].map(([key, label, desc]) => (
+                    <label key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={status.sync_settings?.[key] !== false}
+                        onChange={(e) => updateSettings(key, e.target.checked)}
+                        disabled={busy}
+                        style={{ marginTop: 3 }}
+                      />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
+                        <div style={{ ...type.meta, fontSize: 12 }}>{desc}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </Section>
+
+      <Section title="More integrations" description="Coming soon.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+          {[
+            { icon: '📨', name: 'Outlook Calendar', when: 'Q3 2026' },
+            { icon: '🔌', name: 'Zapier', when: 'Q3 2026' },
+            { icon: '📞', name: 'Zillow Tech Connect', when: 'Q4 2026' },
+            { icon: '✉️', name: 'Gmail lead capture', when: 'Q3 2026' },
+          ].map(item => (
+            <div key={item.name} style={{
+              padding: '14px 16px', background: c.bg,
+              border: `1px solid ${c.borderLight}`, borderRadius: 8,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <span style={{ fontSize: 20 }}>{item.icon}</span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</div>
+                <div style={{ ...type.meta, fontSize: 11 }}>{item.when}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Section>
+    </>
   )
 }
 

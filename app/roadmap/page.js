@@ -23,19 +23,30 @@ const SHIPPED = [
   { title: 'Deal tracker', detail: 'Contract to closing with progress stages and commission tracking.' },
   { title: 'Smart calendar', detail: 'Auto-populated from leads and deals with AI context per event.' },
   { title: 'Lead capture link', detail: 'Personal /r/CODE URL for business cards and Instagram.' },
+  { title: 'CSV lead import', detail: 'Upload CSV from Zillow, Realtor.com, or any spreadsheet. AI guesses column mapping.' },
   { title: 'Marketing ROI', detail: 'Which sources actually produce closings, with AI insight callouts.' },
   { title: 'Morning brief email', detail: 'Personalized daily digest of what needs attention today.' },
   { title: 'Birthday reminders', detail: 'High-touch low-effort relationship moments surfaced automatically.' },
+  { title: 'Home anniversary reminders', detail: 'Closing-anniversary action cards for closed clients — relationship glue most CRMs ignore.' },
   { title: 'Cold deal detection', detail: 'Proactive alerts when a deal stalls or passes its expected close date.' },
+  { title: 'Deal risk scoring', detail: 'Heuristic flags for deals at higher risk of falling apart.' },
+  { title: 'Sentiment analysis', detail: 'AI tags inbound messages as warm / cool / frustrated so you know who\'s cooling off.' },
+  { title: 'Best-time-to-contact', detail: 'AI suggests when each lead is most likely to reply based on their message history.' },
+  { title: 'Lead-to-deal linking', detail: 'Auto-sync deal client info when the underlying lead is updated.' },
+  { title: 'Client deal tracker', detail: 'Public link your buyer/seller can check anytime — eliminates "where are we?" calls.' },
+  { title: 'Referral ledger', detail: 'Track every referral given and received with commission outcomes.' },
+  { title: 'Commission goal pacing', detail: 'Set annual target. See "X leads needed at your conversion rate" to hit it.' },
+  { title: 'Missed-call auto-text', detail: 'One-tap "just missed you, calling back" follow-up from any lead detail.' },
+  { title: 'Google Calendar sync', detail: 'Two-way sync of birthdays, anniversaries, follow-ups, and deal milestones.' },
   { title: 'Customer Portal', detail: 'Self-serve subscription management — update card, cancel, view invoices.' },
   { title: 'Stripe Checkout + Apple Pay', detail: '14-day trial, Apple Pay / Google Pay / Link / Cards.' },
 ]
 
 const IN_PROGRESS = [
-  { title: 'iOS native app', detail: 'App Store submission in progress. Same web codebase wrapped via Capacitor.', eta: 'Q2 2026' },
+  { title: 'iOS native app', detail: 'App Store submission via Capacitor wrapper. Same web codebase, native shell.', eta: 'Q2 2026' },
   { title: 'Android native app', detail: 'Google Play submission to follow iOS launch.', eta: 'Q2 2026' },
-  { title: 'CSV lead import', detail: 'Upload a CSV from Zillow / Realtor.com / your existing CRM. Map columns, preview, bulk import.', eta: 'This month' },
-  { title: 'Best-time-to-contact suggestions', detail: 'AI analyzes each lead\'s response patterns and suggests when they\'re most likely to reply.', eta: 'This month' },
+  { title: 'Listing prep checklist UI', detail: 'Auto-generated tasks for each seller deal (photos, staging, MLS input, disclosures).', eta: 'This week' },
+  { title: 'Offer comparison sheet', detail: 'Multi-offer entry + visual comparison + AI commentary for sellers.', eta: 'This week' },
 ]
 
 const PLANNED = [

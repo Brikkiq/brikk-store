@@ -65,6 +65,7 @@ export default function LeadsPage() {
       : new Date().toISOString()
     payload.birthday = payload.birthday ? new Date(payload.birthday).toISOString() : null
 
+    let savedLeadId = editId
     try {
       if (editId) {
         await supabase.from('leads').update({
@@ -73,11 +74,29 @@ export default function LeadsPage() {
         }).eq('id', editId)
         showToast('Lead updated')
       } else {
-        await supabase.from('leads').insert({ ...payload, user_id: user.id })
+        const { data: inserted } = await supabase
+          .from('leads')
+          .insert({ ...payload, user_id: user.id })
+          .select('id')
+          .single()
+        savedLeadId = inserted?.id
         showToast('Lead added')
       }
     } catch {
       showToast('Something went wrong', 'error')
+    }
+
+    // Fire-and-forget Google Calendar sync. No await — the user shouldn't
+    // wait on this; it's transparent to them.
+    if (savedLeadId && payload.birthday) {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.access_token) {
+        fetch('/api/integrations/google/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ type: 'lead', id: savedLeadId }),
+        }).catch(() => {})
+      }
     }
 
     setSaving(false)

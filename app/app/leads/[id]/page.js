@@ -145,6 +145,7 @@ export default function LeadDetailPage() {
       channel: m.channel,
       content: m.content,
       status: m.status,
+      sentiment: m.sentiment,
     })),
     ...interactions.map(i => ({
       kind: 'interaction',
@@ -200,6 +201,17 @@ export default function LeadDetailPage() {
             )}
             {phone && (
               <a href={`sms:${phone}`} style={{ ...btn.primary, textDecoration: 'none' }}>Text</a>
+            )}
+            {phone && (
+              // Missed-call quick action — pre-fills "just missed you, calling back" text.
+              // Replies feel personal and stop the lead from moving to a competitor.
+              <a
+                href={`sms:${phone}?&body=${encodeURIComponent(`Hey ${(lead.name || '').split(' ')[0] || 'there'}, just missed you — I\'ll call back within the hour. Anything urgent in the meantime?`)}`}
+                style={{ ...btn.secondary, textDecoration: 'none' }}
+                title="Send 'just missed you' text"
+              >
+                Missed call →
+              </a>
             )}
             {lead.email && (
               <a href={`mailto:${lead.email}`} style={{ ...btn.secondary, textDecoration: 'none' }}>Email</a>
@@ -402,6 +414,28 @@ const Avatar = ({ name, temperature }) => {
   )
 }
 
+// Sentiment chip — small colored badge next to inbound messages so the agent
+// can see at a glance whether the lead is warming up or going cold.
+const SentimentChip = ({ sentiment }) => {
+  if (!sentiment || sentiment === 'neutral') return null
+  const styles = {
+    warm:       { label: 'Warm',      color: c.green, bg: c.greenSoft },
+    cool:       { label: 'Cooling',   color: c.amber, bg: c.amberSoft },
+    frustrated: { label: 'Frustrated',color: c.red,   bg: c.redSoft },
+  }
+  const s = styles[sentiment]
+  if (!s) return null
+  return (
+    <span style={{
+      display: 'inline-block', marginLeft: 8,
+      fontSize: 10, fontWeight: 600, color: s.color,
+      background: s.bg, padding: '2px 8px', borderRadius: 4,
+      textTransform: 'uppercase', letterSpacing: '0.04em',
+      verticalAlign: 'middle',
+    }}>{s.label}</span>
+  )
+}
+
 const TimelineRow = ({ item }) => {
   if (item.kind === 'message') {
     const outbound = item.direction === 'outbound'
@@ -415,6 +449,7 @@ const TimelineRow = ({ item }) => {
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ ...type.eyebrow, color: accent }}>
             {outbound ? 'You sent' : 'They replied'} · {item.channel || 'text'}
+            {!outbound && <SentimentChip sentiment={item.sentiment} />}
           </div>
           <div style={{ fontSize: 13, color: c.text, lineHeight: 1.55, marginTop: 2 }}>{item.content}</div>
           <div style={{ ...type.meta, marginTop: 3 }}>{fmt.relativeDate(item.created_at)}</div>

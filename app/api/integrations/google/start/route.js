@@ -42,11 +42,15 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 })
   }
 
-  // Pull the user's session from the cookie/header — we need to know who
-  // we're connecting on behalf of.
+  // Pull the user's session from header, cookie, or query param.
+  // Top-level navigations from the client can't set Authorization headers,
+  // so we accept ?access_token=... as a fallback. The token is short-lived
+  // and we immediately consume it server-side, so URL exposure is acceptable.
+  const url = new URL(request.url)
+  const queryToken = url.searchParams.get('access_token')
   const authHeader = request.headers.get('authorization') || ''
   const cookieToken = request.cookies.get('sb-access-token')?.value
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : cookieToken
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (queryToken || cookieToken)
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized — please sign in first' }, { status: 401 })
   }
