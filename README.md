@@ -1,120 +1,158 @@
-# Brikk — Built to Close
+# Brikk
 
-The command center for real estate agents.
+**AI transaction coordinator in your pocket — for solo real estate agents.**
 
-## What's in this project
-
-- **Landing page** at `/` — marketing site with interactive demo, email capture, features, pricing, FAQ
-- **Full dashboard** at `/demo` — complete 6-screen command center with AI Copilot
-- **PWA ready** — agents can install it on their phone home screen
+[brikk.store](https://brikk.store) · $69.99/month · 14-day free trial · No setup fee
 
 ---
 
-## Deploy to Vercel (Step by Step)
+## What Brikk is
 
-### Prerequisites
-You need these accounts (all free):
-1. GitHub account (github.com)
-2. Vercel account (vercel.com — sign up with GitHub)
+A web app + native mobile wrapper that gives solo real estate agents the same operational leverage a full-stack brokerage would. AI Copilot drafts every follow-up message. Voice-to-CRM lets agents log activity by talking to their phone. Smart calendar auto-builds from the pipeline. Lead capture links replace expensive lead-gen tools. Public client-facing deal trackers eliminate "where are we?" calls. And it costs less than 1/4 of legacy CRMs like Lofty or Follow Up Boss.
 
-### Step 1: Create a GitHub Repository
+Brikk replaces: a $300-500/month CRM + a $300-400/deal transaction coordinator + Calendly + BombBomb + half a dozen scattered apps. For $69.99/month.
 
-1. Go to github.com and log in
-2. Click the **+** icon in the top right corner
-3. Click **"New repository"**
-4. Name it: `brikk-site`
-5. Keep it **Public** (or Private, either works)
-6. Do NOT check "Add a README file" (we already have one)
-7. Click **"Create repository"**
-8. You'll see a page with setup instructions — keep this page open
+## Tech stack
 
-### Step 2: Upload the Project Files
+- **Framework:** Next.js 14 (App Router) on Vercel
+- **Database + auth + realtime:** Supabase (Postgres + Row-Level Security)
+- **AI:** Anthropic Claude Sonnet 4.5 — drafts, voice extraction, sentiment, summaries
+- **Payments:** Stripe Checkout + Customer Portal (live mode, restricted API keys)
+- **Email:** Resend (transactional) + Supabase Auth SMTP (auth flows)
+- **Calendar:** Google Calendar API two-way sync (Microsoft Graph planned)
+- **Native mobile:** Capacitor wrapper → iOS + Android shells around the same Next.js app
+- **Hosting:** Vercel (web), Resend SMTP relay, Supabase managed Postgres
 
-**Option A — Using the GitHub website (easiest, no terminal needed):**
+## Repo layout
 
-1. On your new repository page, click **"uploading an existing file"**
-2. Drag and drop ALL the files from the brikk-site folder
-3. IMPORTANT: You need to recreate the folder structure. GitHub's upload UI is flat, so:
-   - First, create the files at root level (package.json, next.config.js, README.md)
-   - Then use "Add file" > "Create new file" for nested files
-   - For `app/layout.js`, type `app/layout.js` in the filename field (the slash creates the folder)
-   - Do the same for `app/globals.css`, `app/page.js`, `app/demo/page.js`
-   - And for `public/manifest.json`, `public/favicon.svg`
+```
+brikk-store/
+├── app/                              Next.js App Router pages + API routes
+│   ├── page.js                       Marketing landing (brikk.store)
+│   ├── layout.js                     Root layout, metadata, viewport, icons
+│   ├── login/                        Auth (Supabase email/password)
+│   ├── app/                          Logged-in product
+│   │   ├── layout.js                 App shell — sidebar, bottom tab bar, voice button
+│   │   ├── page.js                   Today dashboard (action list, KPIs)
+│   │   ├── copilot/                  AI follow-up draft cards
+│   │   ├── leads/                    Pipeline + lead detail + CSV import
+│   │   ├── deals/                    Deal tracker, share-link button, lead linker
+│   │   ├── messages/                 Conversation history per lead
+│   │   ├── calendar/                 Smart calendar
+│   │   ├── marketing/                Source ROI + commission goal pacing
+│   │   ├── referrals/                Referral ledger
+│   │   ├── settings/                 Profile, team, billing, integrations, etc.
+│   │   └── upgrade/                  Paywall (trial-expired users)
+│   ├── refer/, r/[code]/             Public lead-capture forms
+│   ├── track/[token]/                Public client-facing deal tracker
+│   ├── roadmap/                      Public product roadmap
+│   ├── privacy/, terms/              Legal pages
+│   ├── admin/                        Internal admin (owner-email gated)
+│   └── api/                          Server-side routes
+│       ├── copilot/                  AI mode router (drafts, voice extract, sentiment, etc.)
+│       ├── refer/                    Public lead-capture endpoint
+│       ├── stripe/                   Checkout, webhook, customer portal, sync
+│       ├── integrations/google/      OAuth + sync + poll
+│       ├── cron/morning-brief/       Daily 7am Pacific email digest
+│       ├── team/                     Team CRUD (create, join, leave, remove)
+│       └── sms/                      LEGACY — Twilio routes (not used)
+├── lib/                              Reusable utilities
+│   ├── design.js                     Centralized design tokens
+│   ├── supabase.js                   Supabase client
+│   ├── email.js                      Resend wrapper + lead-confirm template
+│   ├── trial.js                      Trial enforcement state machine
+│   ├── Voice.js                      Floating voice button (used app-wide)
+│   ├── Logo.js                       Brand mark component
+│   ├── birthdays.js                  Birthday detection utilities
+│   ├── listingTemplates.js           Listing-prep + under-contract checklist templates
+│   ├── referralCode.js               Short-code generator for agent referral links
+│   └── integrations/
+│       ├── encrypt.js                AES-256-GCM token storage
+│       ├── google.js                 Token refresh + Calendar API wrapper
+│       └── syncToGoogle.js           Push functions for birthdays, deals, etc.
+├── sql/                              SQL migrations (paste into Supabase SQL Editor)
+├── docs/                             Setup + integration guides
+├── ios-handoff/                      Everything an iOS freelancer needs
+├── public/                           Static assets (icons, manifest, native-bridge)
+├── brand/                            Brand assets (logo, wordmark, splash sources)
+├── marketing/                        Marketing PDFs (door-to-door script, etc.)
+├── pitch/                            Investor/brokerage pitch deck
+├── supabase-email-templates/         Auth email HTML to paste into Supabase Dashboard
+└── capacitor.config.ts               iOS/Android wrapper configuration
+```
 
-**Option B — Using the terminal (faster if comfortable):**
+## Required environment variables
+
+See `.env.example` for the full annotated list. Critical ones:
+
+| Variable | Purpose | Where to get it |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Supabase → Project Settings |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Public anon key | same |
+| `SUPABASE_SERVICE_ROLE_KEY` | Server-only RLS bypass key | same |
+| `ANTHROPIC_API_KEY` | AI Copilot, voice, sentiment | console.anthropic.com |
+| `RESEND_API_KEY` | Transactional emails | resend.com |
+| `STRIPE_SECRET_KEY` | Payment processing (use restricted `rk_live_…`) | Stripe → API keys |
+| `STRIPE_WEBHOOK_SECRET` | Webhook signature verification | Stripe → Webhooks |
+| `STRIPE_PRICE_PRO` / `STRIPE_PRICE_TEAM` | Plan price IDs | Stripe → Products |
+| `CRON_SECRET` | Vercel cron auth for /api/cron/morning-brief | Random 32+ char string |
+| `NEXT_PUBLIC_APP_URL` | Used in callbacks + emails | Always `https://brikk.store` |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` | Calendar integration | Google Cloud Console |
+| `INTEGRATIONS_ENCRYPTION_KEY` | AES key for storing OAuth tokens | `openssl rand -base64 32` |
+| `STATE_SIGNING_SECRET` | OAuth CSRF protection | `openssl rand -base64 32` |
+| `APPLE_PAY_DOMAIN_ASSOCIATION` | Apple Pay verification file | Stripe Dashboard |
+
+## Local development
 
 ```bash
-# Install Git if you don't have it: https://git-scm.com/downloads
-
-cd path/to/brikk-site
-git init
-git add .
-git commit -m "Initial commit - Brikk landing page and dashboard"
-git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/brikk-site.git
-git push -u origin main
+git clone <repo>
+cd brikk-store
+cp .env.example .env.local   # then fill in real values
+npm install
+npm run dev                  # http://localhost:3000
 ```
 
-Replace YOUR_USERNAME with your actual GitHub username.
+## Deploy
 
-### Step 3: Deploy on Vercel
+`git push` to the `main` branch — Vercel auto-deploys.
 
-1. Go to vercel.com and log in
-2. Click **"Add New..."** > **"Project"**
-3. You'll see your GitHub repos — find **brikk-site** and click **"Import"**
-4. Vercel auto-detects it's a Next.js project
-5. Don't change any settings
-6. Click **"Deploy"**
-7. Wait 1-2 minutes — Vercel builds and deploys your site
-8. You'll get a live URL like: `brikk-site.vercel.app`
+For manual deploys: Vercel Dashboard → Deployments → ⋯ → Create deployment → Production → uncheck Build Cache.
 
-### Step 4: Connect Your Domain (brikk.store)
+## Documentation index
 
-1. In Vercel, go to your project settings
-2. Click **"Domains"**
-3. Type `brikk.store` and click **"Add"**
-4. Vercel will show you DNS records to add
-5. Go to Namecheap (where you bought brikk.store)
-6. Go to Domain List > brikk.store > **"Manage"**
-7. Click **"Advanced DNS"**
-8. Add the records Vercel told you to add (usually):
-   - Type: **A Record**, Host: **@**, Value: **76.76.21.21**
-   - Type: **CNAME Record**, Host: **www**, Value: **cname.vercel-dns.com**
-9. Wait 5-30 minutes for DNS to propagate
-10. Your site is now live at **brikk.store**
+Operational + architectural docs in the repo:
+
+- **`ARCHITECTURE.md`** — codebase guide for new developers
+- **`SCHEMA-REFERENCE.md`** — annotated database schema
+- **`OPERATIONS-RUNBOOK.md`** — what to do when X breaks
+- **`SUPPORT-TEMPLATES.md`** — customer-response templates
+- **`BRAND-GUIDELINES.md`** — voice, color, typography rules
+- **`INVESTOR-FAQ.md`** — Q&A beyond the pitch deck
+- **`LAUNCH-DAY.md`** + **`FINALIZE.md`** — launch checklists
+- **`STRIPE-PRODUCTION-SETUP.md`** — Stripe Dashboard playbook
+- **`PRICING-CHANGE.md`** — how to migrate prices in Stripe
+- **`docs/google-calendar-integration.md`** — Google OAuth setup
+- **`ios-handoff/README.md`** — iOS app handoff for freelancer
+- **`AUDIT-RESPONSE.md`** — response to the partner audit
+
+## Contributing / hiring
+
+Hiring a developer? Send them `ARCHITECTURE.md` first. The conventions are documented there. Avoid surprises like adding a new dependency without checking the existing patterns.
+
+Hiring a designer? Send them `BRAND-GUIDELINES.md`. Don't let visual drift creep in.
+
+Outsourcing customer support? Send them `SUPPORT-TEMPLATES.md`. Keeps voice consistent.
+
+## License
+
+Proprietary. © 2026 Brikk. All rights reserved.
+
+## Contact
+
+- Product / partnerships: hello@brikk.store
+- Press: hello@brikk.store
+- Founder: Henry Desrosier (Southern California)
 
 ---
 
-## Project Structure
-
-```
-brikk-site/
-├── package.json          # Dependencies
-├── next.config.js        # Next.js config
-├── README.md             # This file
-├── public/
-│   ├── manifest.json     # PWA manifest
-│   └── favicon.svg       # Brikk logo
-└── app/
-    ├── layout.js         # Root layout, SEO, fonts
-    ├── globals.css       # Global styles
-    ├── page.js           # Landing page (brikk.store)
-    └── demo/
-        └── page.js       # Full dashboard (brikk.store/demo)
-```
-
----
-
-## What's Next
-
-After deploying, your priorities are:
-
-1. Share brikk.store in real estate Facebook groups and Reddit
-2. Collect emails from the landing page
-3. Get 5 pilot agents using the demo with their real data
-4. Build the functional backend (auth, data entry, Claude API for Copilot)
-5. Start charging
-
----
-
-Built with Next.js, React, and Recharts. Deployed on Vercel.
+Brikk is built by realtors, for realtors. Less stuff. More closings.
