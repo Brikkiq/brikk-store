@@ -38,10 +38,14 @@ export default function UpgradePage() {
     setBusy(true)
     setError(null)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/stripe', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, email: user?.email, userId: user?.id }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ plan }),
       })
       const data = await res.json()
       if (data.url) {

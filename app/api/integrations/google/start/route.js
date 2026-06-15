@@ -3,9 +3,15 @@ import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 
 // Start the Google OAuth flow.
-// The user clicks "Connect Google Calendar" → hits this route → we redirect
-// them to Google's consent screen with the proper scopes + a signed state
-// parameter for CSRF protection.
+// The client (Settings → Integrations) POSTs here with its Supabase bearer
+// token in the Authorization header. We verify the session, sign a state
+// parameter for CSRF protection, and RETURN the Google consent URL as JSON.
+// The client then does window.location.href = url to redirect.
+//
+// Why POST-returns-URL instead of GET-redirect: a top-level browser navigation
+// can't send an Authorization header, and putting the Supabase JWT in the URL
+// query string leaks it into browser history, server logs, and the Referer
+// header sent to Google. POST keeps the token in the header where it belongs.
 
 const CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://brikk.store'
@@ -13,25 +19,20 @@ const STATE_SECRET = process.env.STATE_SIGNING_SECRET
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
-// Scopes Brikk needs: read/write calendar events + the user's email for
-// display purposes. We do NOT request full Drive or contacts access.
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.events',
   'https://www.googleapis.com/auth/userinfo.email',
 ].join(' ')
 
 function signState(userId) {
-  // HMAC-SHA256(userId || timestamp). Embed timestamp so we can reject
-  // stale callbacks (>10 min) — protects against replay.
   if (!STATE_SECRET) throw new Error('STATE_SIGNING_SECRET not set')
   const ts = Date.now().toString()
   const payload = `${userId}|${ts}`
   const sig = crypto.createHmac('sha256', STATE_SECRET).update(payload).digest('hex')
-  // Encode as base64url so it's safe in URLs
   return Buffer.from(`${payload}|${sig}`).toString('base64url')
 }
 
-export async function GET(request) {
+export async function POST(request) {
   if (!CLIENT_ID) {
     return NextResponse.json({ error: 'Google OAuth not configured' }, { status: 503 })
   }
@@ -42,15 +43,9 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 })
   }
 
-  // Pull the user's session from header, cookie, or query param.
-  // Top-level navigations from the client can't set Authorization headers,
-  // so we accept ?access_token=... as a fallback. The token is short-lived
-  // and we immediately consume it server-side, so URL exposure is acceptable.
-  const url = new URL(request.url)
-  const queryToken = url.searchParams.get('access_token')
+  // Token ONLY from the Authorization header — never from the URL.
   const authHeader = request.headers.get('authorization') || ''
-  const cookieToken = request.cookies.get('sb-access-token')?.value
-  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : (queryToken || cookieToken)
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized — please sign in first' }, { status: 401 })
   }
@@ -63,18 +58,17 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
   }
 
-  // Build the Google OAuth URL
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     redirect_uri: `${APP_URL}/api/integrations/google/callback`,
     response_type: 'code',
     scope: SCOPES,
-    access_type: 'offline',     // gets refresh token
-    prompt: 'consent',           // forces refresh token even if user has connected before
+    access_type: 'offline',
+    prompt: 'consent',
     state: signState(user.id),
     include_granted_scopes: 'true',
   })
 
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
-  return NextResponse.redirect(url, 302)
+  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
+  return NextResponse.json({ url: googleAuthUrl })
 }

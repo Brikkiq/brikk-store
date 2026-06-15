@@ -1,13 +1,20 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 // Stripe checkout-session creator.
 // Called from /app/upgrade and /app/settings (Billing tab) when a user clicks
 // "Subscribe to Pro" or "Subscribe to Team". Hands them a hosted Stripe
 // checkout URL; the webhook at /api/stripe/webhook flips their subscription
 // status when payment completes.
+//
+// SECURITY: userId + email are derived from the verified Supabase session,
+// NOT from the request body. Trusting client-supplied userId would let an
+// attacker attach a subscription/trial to someone else's account.
 
 const STRIPE_SECRET = process.env.STRIPE_SECRET_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://brikk.store'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 // Enable Stripe Tax only if the partner has finished tax registration in the
 // Stripe Dashboard. Until then, leaving this off avoids 400 errors at checkout.
 const ENABLE_STRIPE_TAX = process.env.STRIPE_ENABLE_TAX === 'true'
@@ -26,8 +33,28 @@ export async function POST(request) {
     if (!STRIPE_SECRET) {
       return NextResponse.json({ error: 'Billing not configured' }, { status: 503 })
     }
+    if (!supabaseUrl || !anonKey) {
+      return NextResponse.json({ error: 'Server not configured' }, { status: 503 })
+    }
 
-    const { plan, email, userId } = await request.json()
+    // Verify the caller's session and derive their identity server-side.
+    // NEVER trust userId/email from the request body.
+    const authHeader = request.headers.get('authorization') || ''
+    const sessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+    if (!sessToken) {
+      return NextResponse.json({ error: 'Unauthorized — sign in first' }, { status: 401 })
+    }
+    const userClient = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${sessToken}` } },
+    })
+    const { data: { user }, error: authErr } = await userClient.auth.getUser(sessToken)
+    if (authErr || !user) {
+      return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
+    }
+    const userId = user.id
+    const email = user.email || ''
+
+    const { plan } = await request.json()
     if (!plan || !PRICES[plan]) {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
     }

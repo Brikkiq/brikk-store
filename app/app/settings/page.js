@@ -586,9 +586,14 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
   const checkout = async (plan) => {
     setSaving(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/stripe', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, email: user?.email, userId: user?.id }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ plan }),
       })
       const data = await res.json()
       if (data.url) window.location.href = data.url
@@ -1106,21 +1111,30 @@ const IntegrationsTab = ({ showToast }) => {
   }
 
   const handleConnect = async () => {
-    // The OAuth route reads the cookie token, so we just navigate.
-    // Pass the auth header via a server-side cookie is the cleanest path;
-    // for now we fall back to passing as a URL parameter or rely on the
-    // existing Supabase auth cookie. The /start route handles both.
+    // POST to /start with the bearer token in the header (never in the URL).
+    // The server returns the Google consent URL, then we redirect to it.
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) {
       showToast('Sign in expired — refresh and try again', 'error')
       return
     }
-    // Open the start URL with auth header — we do this via redirect after
-    // we set a temporary cookie. Simpler: pass token as Authorization on
-    // a fetch and follow the Location. Since browsers won't honor that on
-    // top-level navigation, easiest is to make /start cookie-aware OR
-    // do this:
-    window.location.href = `/api/integrations/google/start?access_token=${encodeURIComponent(session.access_token)}`
+    setBusy(true)
+    try {
+      const res = await fetch('/api/integrations/google/start', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        showToast(data.error || 'Could not start Google connection', 'error')
+        setBusy(false)
+      }
+    } catch {
+      showToast('Could not start Google connection', 'error')
+      setBusy(false)
+    }
   }
 
   const handleDisconnect = async () => {

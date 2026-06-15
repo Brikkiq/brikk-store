@@ -142,9 +142,13 @@ export default function MessagesPage() {
     // if classification fails. Falls back to neutral.
     let sentiment = 'neutral'
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const sentRes = await fetch('/api/copilot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify({ mode: 'sentiment', text: replyText.trim() }),
       })
       const sentData = await sentRes.json()
@@ -185,9 +189,13 @@ export default function MessagesPage() {
     if (!pasteHistory.trim() || !selectedLead) return
     setParsingHistory(true)
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/copilot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify({
           mode: 'parse_chat_history',
           transcript: pasteHistory,
@@ -256,9 +264,13 @@ export default function MessagesPage() {
     }
     if (replyingTo) leadPayload.replying_to = replyingTo
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch('/api/copilot', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify({
           leads: [leadPayload],
           agentName: profile?.full_name || 'Alex',

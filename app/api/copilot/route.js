@@ -1,7 +1,28 @@
 import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY
 const MODEL = 'claude-sonnet-4-5'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+// Verify the caller is a signed-in user. Returns the user, or null.
+// Used to gate the expensive AI modes (everything except the public help_chat).
+async function verifyUser(request) {
+  if (!supabaseUrl || !anonKey) return null
+  const authHeader = request.headers.get('authorization') || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) return null
+  try {
+    const client = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
+    const { data: { user } } = await client.auth.getUser(token)
+    return user || null
+  } catch {
+    return null
+  }
+}
 
 async function callClaude(body) {
   if (!ANTHROPIC_KEY) {
@@ -34,6 +55,16 @@ function safeJson(s) {
 export async function POST(request) {
   try {
     const body = await request.json()
+
+    // Auth gate: every mode EXCEPT help_chat (the public landing-page chat)
+    // requires a signed-in user. Without this, anyone could spam our Anthropic
+    // budget with unlimited requests (denial-of-wallet).
+    if (body.mode !== 'help_chat') {
+      const user = await verifyUser(request)
+      if (!user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
 
     // --- Multi-action voice extraction ---
     // One voice note can produce multiple actions: log an outbound message you sent, log an
