@@ -1,16 +1,53 @@
 'use client'
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts"
 import { Logo } from '@/lib/Logo'
 
 const c = {
-  bg:"#FAFAF9",white:"#FFFFFF",border:"#E8E8E4",borderLight:"#F0F0EC",
-  text:"#1A1A18",sub:"#6B6B66",dim:"#9C9C96",
-  green:"#16803C",greenSoft:"rgba(22,128,60,0.06)",greenBorder:"rgba(22,128,60,0.15)",
+  bg:"#FAFAF9",white:"#FFFFFF",border:"#EAEAE5",borderLight:"#F1F1ED",
+  text:"#191917",sub:"#696964",dim:"#9A9A94",
+  green:"#15803C",greenSoft:"rgba(21,128,60,0.06)",greenBorder:"rgba(21,128,60,0.16)",
   amber:"#A16207",amberSoft:"rgba(161,98,7,0.06)",
   red:"#BE123C",redSoft:"rgba(190,18,60,0.06)",
-  indigo:"#4338CA",indigoSoft:"rgba(67,56,202,0.05)",indigoBorder:"rgba(67,56,202,0.12)",
+  indigo:"#3730A3",indigoSoft:"rgba(55,48,163,0.05)",indigoBorder:"rgba(55,48,163,0.13)",
+}
+
+// Whisper-soft layered shadows — match lib/design.js shadow tokens.
+const shadow = {
+  xs:"0 1px 2px rgba(24,24,22,0.04)",
+  sm:"0 1px 2px rgba(24,24,22,0.04), 0 2px 6px rgba(24,24,22,0.04)",
+  md:"0 2px 4px rgba(24,24,22,0.04), 0 6px 16px rgba(24,24,22,0.06)",
+  lg:"0 4px 8px rgba(24,24,22,0.05), 0 16px 40px rgba(24,24,22,0.08)",
+}
+
+// Reveal — fades + lifts children into view on scroll. Subtle, spring-eased.
+// Pure CSS + IntersectionObserver, no deps. Respects prefers-reduced-motion.
+function Reveal({children,delay=0,as="div",style={}}){
+  const ref=useRef(null)
+  const [shown,setShown]=useState(false)
+  useEffect(()=>{
+    const el=ref.current
+    if(!el) return
+    if(typeof window!=='undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      setShown(true); return
+    }
+    const ob=new IntersectionObserver((entries)=>{
+      entries.forEach(e=>{ if(e.isIntersecting){ setShown(true); ob.disconnect() } })
+    },{threshold:0.12,rootMargin:"0px 0px -8% 0px"})
+    ob.observe(el)
+    return ()=>ob.disconnect()
+  },[])
+  const Tag=as
+  return(
+    <Tag ref={ref} style={{
+      ...style,
+      opacity:shown?1:0,
+      transform:shown?"none":"translateY(14px)",
+      transition:`opacity 0.6s cubic-bezier(0.16,1,0.3,1) ${delay}ms, transform 0.6s cubic-bezier(0.16,1,0.3,1) ${delay}ms`,
+      willChange:"opacity, transform",
+    }}>{children}</Tag>
+  )
 }
 
 const monthlyData=[{m:"J",v:8},{m:"J",v:14},{m:"A",v:12},{m:"S",v:19},{m:"O",v:9},{m:"N",v:22},{m:"D",v:17},{m:"J",v:12},{m:"F",v:19},{m:"M",v:24},{m:"A",v:16},{m:"M",v:21}]
@@ -42,7 +79,7 @@ function LiveDemo(){
     {id:"roi",label:"ROI"},
   ]
   return(
-    <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:12,overflow:"hidden",boxShadow:"0 2px 12px rgba(0,0,0,0.06)"}}>
+    <div style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:16,overflow:"hidden",boxShadow:shadow.lg}}>
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 16px",borderBottom:`1px solid ${c.border}`,background:c.bg}}>
         <div style={{display:"flex",alignItems:"center",gap:8}}>
           <div style={{width:8,height:8,borderRadius:"50%",background:c.green}}/>
@@ -338,7 +375,7 @@ export default function Home(){
           <a href="#features" onClick={(e)=>navLinkClick(e,'#features')} className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Features</a>
           <a href="#how" onClick={(e)=>navLinkClick(e,'#how')} className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Get started</a>
           <a href="#pricing" onClick={(e)=>navLinkClick(e,'#pricing')} className="hide-mobile" style={{fontSize:13,fontWeight:500,color:c.sub}}>Pricing</a>
-          <a href="/login" style={{fontSize:13,fontWeight:600,color:c.bg,background:c.text,padding:"8px 20px",borderRadius:6}}>Start Free</a>
+          <a href="/login" style={{fontSize:13,fontWeight:600,color:c.bg,background:c.text,padding:"8px 20px",borderRadius:8,boxShadow:shadow.xs}}>Start Free</a>
         </div>
       </nav>
       </div>
@@ -346,11 +383,11 @@ export default function Home(){
       {/* Hero */}
       <section className="mobile-pad-hero" style={{padding:"80px 32px 60px",maxWidth:1120,margin:"0 auto"}}>
         <div style={{display:"flex",gap:48,alignItems:"center",flexWrap:"wrap"}}>
-          <div style={{flex:"1 1 320px",maxWidth:460}}>
-            <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
+          <Reveal style={{flex:"1 1 320px",maxWidth:460}}>
+            <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:999,padding:"6px 16px",marginBottom:20}}>
               <span style={{fontSize:12,fontWeight:600,color:c.green}}>First 14 days free — no credit card</span>
             </div>
-            <h1 style={{fontSize:"clamp(34px,5vw,50px)",fontWeight:700,letterSpacing:"-0.03em",lineHeight:1.08,margin:"0 0 20px"}}>
+            <h1 style={{fontSize:"clamp(34px,5vw,52px)",fontWeight:600,letterSpacing:"-0.04em",lineHeight:1.04,margin:"0 0 20px"}}>
               One screen.<br/>Every lead.<br/>AI that acts.
             </h1>
             <p style={{fontSize:16,lineHeight:1.8,color:c.sub,margin:"0 0 12px",maxWidth:420}}>
@@ -375,8 +412,8 @@ export default function Home(){
             {emailError && !submitted && (
               <div style={{fontSize:12,color:c.red,marginTop:8,fontWeight:500}}>{emailError}</div>
             )}
-          </div>
-          <div style={{flex:"1 1 480px",maxWidth:580}}><LiveDemo/></div>
+          </Reveal>
+          <Reveal delay={120} style={{flex:"1 1 480px",maxWidth:580}}><LiveDemo/></Reveal>
         </div>
       </section>
 
@@ -397,7 +434,7 @@ export default function Home(){
       {/* Problem/Solution */}
       <section style={{padding:"60px 20px",maxWidth:1120,margin:"0 auto"}}>
         <div style={{maxWidth:680,margin:"0 auto",textAlign:"center",marginBottom:48}}>
-          <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 16px"}}>You're losing deals to your own workflow.</h2>
+          <h2 style={{fontSize:29,fontWeight:600,letterSpacing:"-0.032em",margin:"0 0 16px"}}>You're losing deals to your own workflow.</h2>
           <p style={{fontSize:15,color:c.sub,lineHeight:1.8,margin:0}}>Zillow. CRM. Google Sheets. Calendar. Email. Phone. Notes app. By the time you've checked everything, the hot lead from Tuesday went with another agent.</p>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:16,maxWidth:800,margin:"0 auto"}}>
@@ -426,7 +463,7 @@ export default function Home(){
       <section id="how" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,background:c.white,scrollMarginTop:80}}>
         <div style={{maxWidth:1120,margin:"0 auto"}}>
           <div style={{textAlign:"center",marginBottom:48}}>
-            <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:0}}>Set up in 5 minutes. Not 5 hours.</h2>
+            <h2 style={{fontSize:29,fontWeight:600,letterSpacing:"-0.032em",margin:0}}>Set up in 5 minutes. Not 5 hours.</h2>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:20}}>
             {[
@@ -434,8 +471,8 @@ export default function Home(){
               ["2","AI goes to work","Copilot analyzes every lead and drafts personalized follow-ups. Your calendar auto-fills with deadlines. Marketing ROI shows which sources work."],
               ["3","One tap to act","Approve AI drafts, send texts, log contacts, track deals — all from one screen. Stop juggling. Start closing."],
             ].map(([num,title,desc],i)=>(
-              <div key={i} style={{padding:"28px 24px",borderRadius:10,border:`1px solid ${c.border}`,background:c.bg}}>
-                <div style={{width:36,height:36,borderRadius:8,background:c.text,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>{num}</div>
+              <div key={i} style={{padding:"28px 24px",borderRadius:14,border:`1px solid ${c.border}`,background:c.bg}}>
+                <div style={{width:36,height:36,borderRadius:10,background:c.text,display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,fontWeight:700,color:"#fff",marginBottom:16}}>{num}</div>
                 <div style={{fontSize:16,fontWeight:700,marginBottom:8}}>{title}</div>
                 <div style={{fontSize:14,color:c.sub,lineHeight:1.7}}>{desc}</div>
               </div>
@@ -448,7 +485,7 @@ export default function Home(){
       <section id="features" style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,scrollMarginTop:80}}>
         <div style={{maxWidth:1120,margin:"0 auto"}}>
           <div style={{marginBottom:48}}>
-            <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>What you get today.</h2>
+            <h2 style={{fontSize:29,fontWeight:600,letterSpacing:"-0.032em",margin:"0 0 8px"}}>What you get today.</h2>
             <p style={{fontSize:15,color:c.sub,margin:0}}>Every feature works. No "coming soon." No vapor.</p>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:12}}>
@@ -463,7 +500,7 @@ export default function Home(){
               ["Voice-to-CRM","Tap the mic. Speak naturally about a lead — what you texted, what they replied, a price change. AI parses it into structured updates you review and approve."],
               ["Lead Capture Link","A short URL like brikk.store/r/YOUR-CODE that anyone can fill out. Submissions land in your pipeline and you get a live alert. Put it on your business card or in your Instagram bio."],
             ].map(([title,desc],i)=>(
-              <div key={i} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:8,padding:"22px 20px"}}>
+              <div key={i} style={{background:c.white,border:`1px solid ${c.border}`,borderRadius:12,padding:"22px 20px",boxShadow:shadow.xs}}>
                 <div style={{fontSize:14,fontWeight:700,marginBottom:6}}>{title}</div>
                 <div style={{fontSize:13,color:c.sub,lineHeight:1.6}}>{desc}</div>
               </div>
@@ -475,7 +512,7 @@ export default function Home(){
       {/* Moat */}
       <section style={{padding:"48px 20px",borderTop:`1px solid ${c.border}`,textAlign:"center",background:c.white}}>
         <div style={{maxWidth:640,margin:"0 auto"}}>
-          <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 16px"}}>The longer you use it, the smarter it gets.</h2>
+          <h2 style={{fontSize:29,fontWeight:600,letterSpacing:"-0.032em",margin:"0 0 16px"}}>The longer you use it, the smarter it gets.</h2>
           <p style={{fontSize:15,color:c.sub,lineHeight:1.8,margin:0}}>After 90 days, Brikk knows your conversion patterns, your message style, your best lead sources, and your client relationships. That intelligence compounds monthly — and it doesn't transfer to a competitor.</p>
         </div>
       </section>
@@ -491,7 +528,7 @@ export default function Home(){
             <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"4px 14px",marginBottom:14}}>
               <span style={{fontSize:11,fontWeight:600,color:c.green}}>Early access — first 50 agents</span>
             </div>
-            <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>Agents using Brikk today</h2>
+            <h2 style={{fontSize:29,fontWeight:600,letterSpacing:"-0.032em",margin:"0 0 8px"}}>Agents using Brikk today</h2>
             <p style={{fontSize:14,color:c.sub,margin:0}}>Real names, real markets, real numbers.</p>
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:16}}>
@@ -537,7 +574,7 @@ export default function Home(){
       {/* Pricing */}
       <section id="pricing" style={{padding:"48px 20px 60px",borderTop:`1px solid ${c.border}`,scrollMarginTop:80}}>
         <div style={{maxWidth:560,margin:"0 auto",textAlign:"center"}}>
-          <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 8px"}}>Simple pricing. No surprises.</h2>
+          <h2 style={{fontSize:29,fontWeight:600,letterSpacing:"-0.032em",margin:"0 0 8px"}}>Simple pricing. No surprises.</h2>
           <p style={{fontSize:15,color:c.sub,marginBottom:24}}>Start free. Cancel anytime. No contracts.</p>
         </div>
         <div style={{maxWidth:1020,margin:"0 auto",textAlign:"center"}}>
@@ -604,7 +641,7 @@ export default function Home(){
       {/* FAQ */}
       <section style={{padding:"60px 20px",borderTop:`1px solid ${c.border}`,background:c.white}}>
         <div style={{maxWidth:680,margin:"0 auto"}}>
-          <h2 style={{fontSize:28,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 32px"}}>Common questions</h2>
+          <h2 style={{fontSize:29,fontWeight:600,letterSpacing:"-0.032em",margin:"0 0 32px"}}>Common questions</h2>
           {faqs.map((f,i)=>(
             <div key={i} style={{borderBottom:`1px solid ${c.border}`}}>
               <button onClick={()=>setOpenFaq(openFaq===i?null:i)} style={{width:"100%",background:"none",border:"none",padding:"20px 0",display:"flex",justifyContent:"space-between",alignItems:"center",cursor:"pointer",fontFamily:"inherit"}}>
@@ -623,7 +660,7 @@ export default function Home(){
           <div style={{display:"inline-block",background:c.greenSoft,border:`1px solid ${c.greenBorder}`,borderRadius:20,padding:"6px 16px",marginBottom:20}}>
             <span style={{fontSize:12,fontWeight:600,color:c.green}}>Limited — first 14 days free</span>
           </div>
-          <h2 style={{fontSize:32,fontWeight:700,letterSpacing:"-0.02em",margin:"0 0 12px"}}>Your leads are waiting.</h2>
+          <h2 style={{fontSize:34,fontWeight:600,letterSpacing:"-0.035em",lineHeight:1.05,margin:"0 0 12px"}}>Your leads are waiting.</h2>
           <p style={{fontSize:15,color:c.sub,marginBottom:28}}>14 days free. No credit card. Everything included.</p>
           <div style={{display:"flex",justifyContent:"center",gap:10,flexWrap:"wrap"}}>
             {!submitted?<>

@@ -6,6 +6,7 @@ import { c } from '@/lib/design'
 import { Logo } from '@/lib/Logo'
 import { ensureReferralCode } from '@/lib/referralCode'
 import { VoiceButton } from '@/lib/Voice'
+import { Onboarding } from '@/lib/Onboarding'
 import { getTrialState, shouldGate } from '@/lib/trial'
 
 const navItems = [
@@ -538,6 +539,9 @@ export default function AppLayout({ children }) {
           {children}
         </main>
       </div>
+
+      {/* First-run onboarding — shows once for new accounts with zero leads */}
+      <Onboarding />
 
       {/* Floating voice button — available on every signed-in page */}
       <VoiceButton leadHint={detectLeadFromPath(currentPath)} />
