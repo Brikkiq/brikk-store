@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { c, type, card, btn, input, inputLabel } from '@/lib/design'
 import { Logo } from '@/lib/Logo'
@@ -18,6 +18,11 @@ export default function Login() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
   const [showConfirmation, setShowConfirmation] = useState(false)
+
+  // Launch page links here with ?mode=signup.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mode') === 'signup') setMode('signup')
+  }, [])
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -49,7 +54,8 @@ export default function Login() {
     const { data, error } = await supabase.auth.signUp({
       email, password,
       options: {
-        data: { full_name: fullName },
+        // Saved onto the profile by the handle_new_user trigger (sql/li-01).
+        data: { full_name: fullName, phone: phone || null, agency_name: brokerage || null },
         emailRedirectTo: `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/callback`,
       },
     })
@@ -59,13 +65,6 @@ export default function Login() {
       else setError(error.message)
       setLoading(false)
       return
-    }
-
-    if (data?.user?.id && (phone || brokerage)) {
-      const { error: profileErr } = await supabase.from('profiles').update({
-        phone: phone || null, brokerage: brokerage || null,
-      }).eq('id', data.user.id)
-      if (profileErr) console.warn('Profile update failed:', profileErr.message)
     }
 
     // Pending team join — applied after the user confirms their email and signs in for the first time.
@@ -139,7 +138,7 @@ export default function Login() {
             <Logo size={22} />
           </a>
           <div style={{ ...type.bodySub, marginTop: 10 }}>
-            {mode === 'login' ? 'Welcome back.' : 'Start your 14-day free trial.'}
+            {mode === 'login' ? 'Welcome back.' : 'Start your 7-day free trial.'}
           </div>
           {mode === 'signup' && (
             <div style={{ fontSize: 12, color: c.green, fontWeight: 500, marginTop: 4 }}>
@@ -183,8 +182,8 @@ export default function Login() {
               <Field label="Phone">
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} onKeyDown={onKey} placeholder="(801) 555-0142" style={input} />
               </Field>
-              <Field label="Brokerage">
-                <input value={brokerage} onChange={e => setBrokerage(e.target.value)} onKeyDown={onKey} placeholder="Keller Williams, eXp…" style={input} />
+              <Field label="Agency">
+                <input value={brokerage} onChange={e => setBrokerage(e.target.value)} onKeyDown={onKey} placeholder="Your agency or IMO (optional)" style={input} />
               </Field>
               {!showTeamCode ? (
                 <button

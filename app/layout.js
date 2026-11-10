@@ -1,19 +1,19 @@
 import './globals.css'
 
 export const metadata = {
-  title: 'Brikk — Built to Close',
-  description: 'The command center for real estate agents. AI-powered follow-ups, lead management, deal tracking. $69.99/month, no setup fee.',
+  title: 'Brikk — Follow-ups for life insurance agents',
+  description: 'The simple CRM for life insurance agents. Automatic policy follow-ups, annual reviews and family birthdays, with one-tap texts from your own phone. 7 days free, then $7.99/week.',
   openGraph: {
-    title: 'Brikk — Built to Close',
-    description: 'The command center for real estate agents. One screen. Every deal. AI that acts.',
+    title: 'Brikk — Follow-ups for life insurance agents',
+    description: 'Every client follow-up. Written for you. Sent in one tap.',
     type: 'website',
     url: 'https://brikk.store',
     siteName: 'Brikk',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Brikk — Built to Close',
-    description: 'The command center for real estate agents.',
+    title: 'Brikk — Follow-ups for life insurance agents',
+    description: 'Every client follow-up. Written for you. Sent in one tap.',
   },
   manifest: '/manifest.json',
   applicationName: 'Brikk',
@@ -36,7 +36,7 @@ export const metadata = {
 // Viewport — allows pinch-zoom for accessibility (WCAG 1.4.4). The original
 // request was to block zoom for a native-app feel, but that violates
 // accessibility standards and hurts visually impaired visitors. The native
-// feel inside /app comes from the 8-tab bottom bar + PWA install (full-screen,
+// feel inside /app comes from the bottom tab bar + PWA install (full-screen,
 // no browser chrome) — not from locking zoom. Logged-in users rarely pinch-
 // zoom inside an app anyway.
 export const viewport = {

@@ -14,14 +14,14 @@ export default function Privacy() {
         <div style={{ fontSize: 14, color: c.sub, lineHeight: 1.8 }}>
 
           <h2 style={h2}>1. Information We Collect</h2>
-          <p>When you create a Brikk account, we collect your name, email address, phone number, and brokerage information. When you use Brikk, we store the lead information, deal details, messages, interactions, and any other content you choose to enter into the platform.</p>
+          <p>When you create a Brikk account, we collect your name, email address, phone number, agency, and time zone. When you use Brikk, we store the client households you enter (names, contact details and birthdays of household members), policy basics (carrier, product, policy number, face amount, premium, key dates and beneficiary names), follow-up reminders, and notes. <strong>Brikk does not collect or store health or medical information</strong>, and the app asks you not to enter any.</p>
           <p>When prospects fill out your lead-capture link, we collect their name, phone number, email, and any details they provide. That data flows directly into your account.</p>
 
           <h2 style={h2}>2. How We Use Your Information</h2>
           <p>We use your information to provide and improve the Brikk service, including:</p>
           <p style={{ marginLeft: 20 }}>
             • Operating your account and providing customer support<br />
-            • Generating AI-powered follow-up drafts using your lead data<br />
+            • Scheduling follow-up and birthday reminders from the dates you enter<br />
             • Routing lead-capture submissions to the correct agent<br />
             • Sending transactional emails (signup confirmations, lead-capture notifications)<br />
             • Sending you service-related notifications<br />
@@ -31,25 +31,24 @@ export default function Privacy() {
           <h2 style={h2}>3. Data Storage and Security</h2>
           <p>Your data is stored securely using Supabase (PostgreSQL database) with row-level security policies. Each user can only access their own data. All data is transmitted over HTTPS encryption. We do not sell your data to third parties.</p>
 
-          <h2 style={h2}>4. AI Processing</h2>
-          <p>Brikk uses AI (powered by Anthropic's Claude) to generate follow-up message drafts and to parse voice notes into structured CRM updates. Your lead data is sent to Anthropic's API for these purposes. Per Anthropic's commercial terms, your data is not used to train their models. Generated drafts are only visible to you.</p>
+          <h2 style={h2}>4. No Health Information</h2>
+          <p>Brikk is designed so that no health, medical, or underwriting information is collected or stored. There are no fields for it, and the app does not send your data to any AI service.</p>
 
           <h2 style={h2}>5. Communications & Messaging</h2>
-          <p>Brikk does not send SMS messages on your behalf from our servers. Outbound text messages are composed in Brikk and opened in your own phone's native messaging app — they are sent from your personal mobile number, on your own carrier. Brikk logs the message content for your records.</p>
+          <p>Brikk does not send SMS messages on your behalf from our servers. Outbound text messages are composed in Brikk and opened in your own phone's native messaging app — they are sent from your personal mobile number, on your own carrier. Brikk records that you opened or sent a reminder text, for your timeline.</p>
           <p>Transactional emails (signup confirmations, password resets, lead-capture notifications) are delivered through Resend on Brikk's behalf.</p>
 
           <h2 style={h2}>6. Third-Party Services</h2>
           <p>Brikk uses the following third-party services:</p>
           <p style={{ marginLeft: 20 }}>
             • <strong>Supabase</strong> — database and authentication<br />
-            • <strong>Anthropic (Claude)</strong> — AI message drafting and voice parsing<br />
             • <strong>Resend</strong> — transactional email delivery<br />
             • <strong>Stripe</strong> — payment processing<br />
             • <strong>Vercel</strong> — application hosting
           </p>
 
           <h2 style={h2}>7. Data Retention</h2>
-          <p>Your data is retained for as long as your account is active. If you delete your account, all associated data (leads, deals, messages, interactions) will be permanently deleted within 30 days.</p>
+          <p>Your data is retained for as long as your account is active. If you delete your account, all associated data (clients, household members, policies, follow-ups, notes) will be permanently deleted within 30 days.</p>
 
           <h2 style={h2}>8. Your Rights</h2>
           <p>You have the right to access, update, or delete your personal data at any time through the app's Settings → Privacy page. You may also request a complete data export or account deletion by emailing hello@brikk.store.</p>
@@ -64,7 +63,7 @@ export default function Privacy() {
           <p>When prospects submit your lead-capture form, they agree to be contacted by you. You — the agent — are responsible for complying with applicable laws governing lead contact, including the Telephone Consumer Protection Act (TCPA), CAN-SPAM, and any state-level consumer-protection rules. Brikk facilitates the contact but does not initiate calls or texts on your behalf.</p>
 
           <h2 style={h2}>11. Children's Privacy</h2>
-          <p>Brikk is not intended for use by anyone under the age of 18. We do not knowingly collect data from minors.</p>
+          <p>Brikk accounts are only for adults 18 and over. As part of a client’s household record, an agent may enter the first and last name and birthday of a client’s children so the agent can send birthday wishes to the family. We do not collect any other information about minors, and minors do not use Brikk.</p>
 
           <h2 style={h2}>12. Changes to This Policy</h2>
           <p>We may update this privacy policy from time to time. We will notify users of significant changes via email or in-app notification.</p>

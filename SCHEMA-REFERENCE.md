@@ -1,4 +1,41 @@
-# Brikk database schema reference
+# Schema reference
+
+## Life insurance schema (current — Nov 2026)
+
+Run in the Supabase SQL Editor **in this order** (each file is safe to re-run):
+
+1. `sql/sec-01-lock-down-profiles.sql` — security fix: users can no longer edit their own
+   billing/team/trial columns; adds `processed_stripe_events` (webhook idempotency),
+   `rate_limits` + `hit_rate_limit()` (public form rate limiting). Also lists all RLS policies —
+   check for any dashboard-added policy wider than "own rows".
+2. `sql/li-01-households.sql` — `households`, `household_members`; profile `timezone`,
+   `agency_name`, `last_brief_date`; signup trigger copies phone/agency.
+3. `sql/li-02-policies.sql` — `policies` (with `beneficiaries` jsonb: names + relationship only).
+4. `sql/li-03-follow-ups.sql` — `follow_up_templates`, `follow_ups`, `activity`.
+5. `sql/li-04-backfill-from-leads.sql` — copies every old lead into a household (prospect).
+
+| Table | What it holds |
+|---|---|
+| `households` | One client family: display name, phone, email, address, source, status (`prospect`/`client`/`inactive`), notes, `last_contact_at`, `legacy_lead_id`. |
+| `household_members` | Each person: role (`policyholder`/`spouse`/`child`/`other`), first/last name, **birthday**, phone, email. |
+| `policies` | Carrier, product, policy #, face amount, monthly premium, application/effective/first draft dates, status, beneficiaries. **No health fields — never add any.** |
+| `follow_up_templates` | Each agent's editable schedule (anchor date + day/month offsets, repeat yearly, text template). |
+| `follow_ups` | Concrete reminders (policy steps, annual reviews, birthdays, manual). `dedupe_key` unique per agent makes generation idempotent. Status: `pending`/`opened`/`done`/`skipped`. |
+| `activity` | What the agent did (text opened/sent, call, note, policy added, skipped, imported history). |
+
+All tables: `user_id` + RLS `user_id = auth.uid()`. Child tables use a composite foreign key
+`(household_id, user_id)` so a row can only attach to a household owned by the same agent.
+Logic that writes these tables lives in `lib/server/book.js`; the HTTP contract is in `API.md`.
+
+**Legacy (real-estate) tables still present until the final drop step (PLAN.md 6.9):**
+`leads`, `deals`, `messages`, `interactions`, `checklist_items`, `offers`, `referrals`,
+`integrations`, `calendar_event_sync`. Nothing in the app reads them any more except the
+li-04 backfill.
+
+---
+
+## Legacy real-estate schema (for reference)
+
 
 Annotated reference for every table and column. Read this when joining the team, debugging weird data states, or planning a schema migration.
 

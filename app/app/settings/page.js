@@ -2,14 +2,18 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/client/api'
+import { ScheduleTab } from './ScheduleTab'
+import { US_ZONES } from '@/lib/Onboarding'
+import { isValidTimeZone } from '@/lib/core/dates'
 import { c, type, card, btn, input, inputLabel } from '@/lib/design'
 
 const TABS = [
   { id: 'profile',      label: 'Profile' },
+  { id: 'schedule',     label: 'Follow-up schedule' },
   { id: 'team',         label: 'Team' },
   { id: 'appearance',   label: 'Appearance' },
   { id: 'billing',      label: 'Billing' },
-  { id: 'integrations', label: 'Integrations' },
   { id: 'referral',     label: 'Lead capture link' },
   { id: 'privacy',      label: 'Privacy' },
   { id: 'agreement',    label: 'Legal' },
@@ -25,6 +29,7 @@ export default function SettingsPage() {
   const [editName, setEditName] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [editBrokerage, setEditBrokerage] = useState('')
+  const [editTimezone, setEditTimezone] = useState('America/New_York')
   const [profilePic, setProfilePic] = useState(null)
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
@@ -55,7 +60,7 @@ export default function SettingsPage() {
 
     if (payment === 'success') {
       setActiveTab('billing')
-      showToast('🎉 Subscription started. You\'re in your 14-day trial — card on file, no charge until trial ends.', 'success')
+      showToast('🎉 Subscription started. You\'re in your 7-day free trial — card on file, no charge until it ends.', 'success')
     } else if (payment === 'cancelled') {
       setActiveTab('billing')
       showToast('Checkout cancelled. No charge made.', 'info')
@@ -134,12 +139,14 @@ export default function SettingsPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUser(user)
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+    let data = null
+    try { data = (await api.get('/me')).profile } catch {}
     if (data) {
       setProfile(data)
       setEditName(data.full_name || '')
       setEditPhone(data.phone || '')
-      setEditBrokerage(data.brokerage || '')
+      setEditBrokerage(data.agency_name || '')
+      setEditTimezone(data.timezone || 'America/New_York')
     }
     setLoading(false)
   }
@@ -147,9 +154,14 @@ export default function SettingsPage() {
   const saveProfile = async () => {
     if (!user) return
     setSaving(true)
-    const { error } = await supabase.from('profiles').update({
-      full_name: editName, phone: editPhone, brokerage: editBrokerage,
-    }).eq('id', user.id)
+    let error = null
+    try {
+      const saved = await api.patch('/me', {
+        full_name: editName, phone: editPhone, agency_name: editBrokerage,
+        timezone: isValidTimeZone(editTimezone) ? editTimezone : undefined,
+      })
+      setProfile(prev => ({ ...prev, ...saved }))
+    } catch (e) { error = e }
     setSaving(false)
     if (error) showToast(error.message, 'error')
     else {
@@ -358,6 +370,7 @@ export default function SettingsPage() {
               editName={editName} setEditName={setEditName}
               editPhone={editPhone} setEditPhone={setEditPhone}
               editBrokerage={editBrokerage} setEditBrokerage={setEditBrokerage}
+              editTimezone={editTimezone} setEditTimezone={setEditTimezone}
               profilePic={profilePic}
               initials={initials}
               fileInputRef={fileInputRef}
@@ -371,6 +384,8 @@ export default function SettingsPage() {
             />
           )}
 
+          {activeTab === 'schedule' && <ScheduleTab showToast={showToast} />}
+
           {activeTab === 'appearance' && (
             <AppearanceTab
               darkMode={darkMode} setDarkMode={setDarkMode}
@@ -383,7 +398,6 @@ export default function SettingsPage() {
           {activeTab === 'team' && <TeamTab user={user} showToast={showToast} />}
 
           {activeTab === 'billing' && <BillingTab user={user} profile={profile} saving={saving} setSaving={setSaving} showToast={showToast} />}
-          {activeTab === 'integrations' && <IntegrationsTab showToast={showToast} />}
           {activeTab === 'referral' && <ReferralTab referralLink={referralLink} referralCode={referralCode} showToast={showToast} />}
           {activeTab === 'privacy' && <PrivacyTab />}
           {activeTab === 'agreement' && <AgreementTab />}
@@ -421,7 +435,7 @@ const Field = ({ label, children }) => (
 )
 
 const ProfileTab = ({
-  user, editName, setEditName, editPhone, setEditPhone, editBrokerage, setEditBrokerage,
+  user, editName, setEditName, editPhone, setEditPhone, editBrokerage, setEditBrokerage, editTimezone, setEditTimezone,
   profilePic, initials, fileInputRef, onPic, onSave, saving,
   oldPassword, setOldPassword, newPassword, setNewPassword, confirmPassword, setConfirmPassword, onChangePassword,
 }) => (
@@ -459,8 +473,13 @@ const ProfileTab = ({
         <Field label="Phone">
           <input value={editPhone} onChange={e => setEditPhone(e.target.value)} placeholder="(801) 555-0142" style={input} />
         </Field>
-        <Field label="Brokerage">
-          <input value={editBrokerage} onChange={e => setEditBrokerage(e.target.value)} placeholder="Keller Williams, eXp…" style={input} />
+        <Field label="Agency">
+          <input value={editBrokerage} onChange={e => setEditBrokerage(e.target.value)} placeholder="Your agency or IMO" style={input} />
+        </Field>
+        <Field label="Time zone">
+          <select value={editTimezone} onChange={e => setEditTimezone(e.target.value)} style={input}>
+            {[...new Set([editTimezone, ...US_ZONES])].map(z => <option key={z} value={z}>{z.replace(/_/g, ' ')}</option>)}
+          </select>
         </Field>
       </div>
 
@@ -500,7 +519,7 @@ const AppearanceTab = ({ darkMode, setDarkMode, brightness, setBrightness, blueL
       control={<Toggle on={darkMode} onChange={() => setDarkMode(!darkMode)} />}
     />
     <Slider label="Brightness" value={brightness} min={40} max={100} unit="%" onChange={v => setBrightness(v)} />
-    <Slider label="Blue light filter" value={blueLight} min={0} max={100} unit="%" onChange={v => setBlueLight(v)} color="#D97706" />
+    <Slider label="Blue light filter" value={blueLight} min={0} max={100} unit="%" onChange={v => setBlueLight(v)} color={c.amber} />
     <div style={{ marginTop: 12 }}>
       <div style={{ ...inputLabel, marginBottom: 8 }}>Text size</div>
       <div style={{ display: 'flex', gap: 6 }}>
@@ -633,7 +652,7 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
   // ---- Subscribed state: show current plan + Manage button ----
   if (isSubscribed) {
     const planLabel = subscriptionPlan === 'team' ? 'Team' : subscriptionPlan === 'agency' ? 'Agency' : 'Pro'
-    const priceLabel = subscriptionPlan === 'team' ? '$160/month' : subscriptionPlan === 'agency' ? 'Custom' : '$69.99/month'
+    const priceLabel = subscriptionPlan === 'team' || subscriptionPlan === 'agency' ? 'Team pricing' : '$7.99/week'
     const isTrial = subscriptionStatus === 'trialing'
     return (
       <>
@@ -647,7 +666,7 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
                 <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>{planLabel} plan {isTrial ? '· Trialing' : '· Active'}</div>
                 <div style={{ ...type.bodySub, marginTop: 2 }}>
                   {isTrial
-                    ? 'You\'re in your 14-day free trial. Card on file, no charge until trial ends.'
+                    ? 'You\'re in your 7-day free trial. Card on file, no charge until the trial ends.'
                     : `${priceLabel}. Renews automatically.`}
                 </div>
               </div>
@@ -679,7 +698,7 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
             background: 'rgba(190,18,60,0.06)', border: `1px solid rgba(190,18,60,0.2)`,
             borderRadius: 6, padding: '14px 16px',
           }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#BE123C' }}>Your last payment failed.</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: c.red }}>Your last payment failed.</div>
             <div style={{ ...type.bodySub, marginTop: 2 }}>
               Update your payment method to keep your subscription active. Stripe will retry automatically once you do.
             </div>
@@ -706,40 +725,26 @@ const BillingTab = ({ user, profile, saving, setSaving, showToast }) => {
           background: c.greenSoft, border: `1px solid ${c.greenBorder}`,
           borderRadius: 6, padding: '14px 16px',
         }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>Free trial active</div>
-          <div style={{ ...type.bodySub, marginTop: 2 }}>Full access to every feature for 14 days. No charge until you subscribe.</div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: c.green }}>Free trial</div>
+          <div style={{ ...type.bodySub, marginTop: 2 }}>Full access to everything for 7 days. Subscribe any time to keep going.</div>
         </div>
       </Section>
 
-      <Section title="Plans" description="14-day trial when you subscribe. Cancel anytime to stop future charges.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+      <Section title="Plan" description="One simple plan. Cancel anytime to stop future charges.">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12, maxWidth: 420 }}>
           <PlanCard
-            title="Pro" subtitle="Solo agents"
-            price="$69.99" period="/mo" setup="No setup fee"
-            features="AI Copilot · Pipeline · Deals · Calendar · Marketing · Messages · Voice-to-CRM · Lead capture link"
+            title="Pro" subtitle="For independent life insurance agents"
+            price="$7.99" period="/week" setup="7-day free trial"
+            features="Unlimited clients · Household birthdays · Automatic policy follow-ups · Annual reviews · One-tap texting from your own phone"
             primary
             onClick={() => checkout('pro')}
             saving={saving}
           />
-          <PlanCard
-            title="Team" subtitle="Up to 5 agents"
-            price="$160" period="/mo" setup="No setup fee"
-            features="Everything in Pro plus team management with shared seats, team code for member onboarding, and priority support."
-            onClick={() => checkout('team')}
-            saving={saving}
-          />
-          <PlanCard
-            title="Agency" subtitle="Unlimited agents"
-            price="Custom" period="" setup="Custom onboarding"
-            features="Everything in Team, scaled for brokerages. Team-code seat management, dedicated success contact, custom SLAs, and onboarding support for your full agent roster."
-            contactSales
-            saving={saving}
-          />
         </div>
         <div style={{ ...type.meta, marginTop: 14, maxWidth: 560, lineHeight: 1.5 }}>
-          Payments secured by Stripe. Apple Pay, Google Pay, Link, and major cards accepted.
+          Payments secured by Stripe. Apple Pay, Google Pay, Link, and major cards accepted. Billed weekly after your 7-day free trial.
           <br />
-          <strong style={{ color: c.text }}>All sales final. No refunds</strong> — the 14-day trial is your evaluation window. Cancel anytime to stop future charges. See <a href="/terms" style={{ color: c.dim, textDecoration: 'underline' }}>Terms</a>.
+          <strong style={{ color: c.text }}>All sales final. No refunds</strong> — the free trial is your evaluation window. Cancel anytime to stop future charges. See <a href="/terms" style={{ color: c.dim, textDecoration: 'underline' }}>Terms</a>.
         </div>
       </Section>
     </>
@@ -786,7 +791,7 @@ const PlanCard = ({ title, subtitle, price, period, setup, features, primary, co
 
 const ReferralTab = ({ referralLink, referralCode, showToast }) => (
   <>
-    <Section title="Your lead capture link" description="Share this on business cards, Instagram bio, email signature, or anywhere prospects might see you. Submissions land in your Leads pipeline tagged 'Referral Link' and you get a live alert.">
+    <Section title="Your lead capture link" description="Share this on business cards, Instagram bio, email signature, or anywhere prospects might see you. Submissions land in your Book as a new prospect.">
       <div style={{
         background: c.bgInset, border: `1px solid ${c.border}`,
         borderRadius: 6, padding: '12px 14px',
@@ -814,7 +819,7 @@ const ReferralTab = ({ referralLink, referralCode, showToast }) => (
           display: 'inline-block', marginBottom: 8,
         }}>{referralCode}</div>
         <div style={{ ...type.meta }}>
-          A lead can also enter this code at <span style={{ color: c.text, fontFamily: 'ui-monospace, monospace' }}>brikk.store/refer</span> to be routed to you.
+          Your short link is <span style={{ color: c.text, fontFamily: "ui-monospace, monospace" }}>brikk.store/r/{referralCode}</span>.
         </div>
       </Section>
     )}
@@ -824,8 +829,8 @@ const ReferralTab = ({ referralLink, referralCode, showToast }) => (
         <li>Instagram bio or "Link in bio" tools (Linktree, Beacons)</li>
         <li>Email signature, below your name</li>
         <li>QR code on your business card</li>
-        <li>Door hangers, open-house sign-in pages, yard signs</li>
-        <li>The end of a "Just sold" or "Coming soon" social post</li>
+        <li>Flyers and mailers for your local market</li>
+        <li>Facebook and Instagram posts about final expense or term coverage</li>
       </ul>
     </Section>
   </>
@@ -833,12 +838,11 @@ const ReferralTab = ({ referralLink, referralCode, showToast }) => (
 
 const PrivacyTab = () => (
   <>
-    <Section title="How your data is used" description="Brikk stores leads, deals, messages, and interactions you create. Your data is isolated by Supabase row-level security — only you can see your own pipeline.">
+    <Section title="How your data is used" description="Brikk stores the clients, household members, policy basics, follow-ups and notes you enter. Your data is isolated by row-level security — only you can see your own Book.">
       <ul style={{ ...type.bodySub, paddingLeft: 18, margin: 0, lineHeight: 1.75 }}>
-        <li>AI Copilot reads each lead's history when drafting follow-ups (Anthropic).</li>
-        <li>Voice notes are transcribed in your browser, then sent to Anthropic to extract structured fields.</li>
-        <li>SMS goes through Twilio and is logged to your conversation history.</li>
-        <li>We never sell data and don't share it with third parties beyond the providers above.</li>
+        <li>No health or medical information is collected or stored — please don’t type any into notes.</li>
+        <li>Texts are sent from your own phone’s Messages app. Brikk never sends texts for you and has no access to your messages.</li>
+        <li>We never sell data and don't share it with third parties beyond our hosting, database, email and payment providers.</li>
       </ul>
     </Section>
     <Section title="Account">
@@ -965,7 +969,7 @@ const TeamTab = ({ user, showToast }) => {
 
         <Section
           title="Join a team"
-          description="Already have a team code from your team lead or brokerage? Enter it here to skip individual billing."
+          description="Already have a team code from your team lead or agency? Enter it here to skip individual billing."
         >
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 12 }}>
             <Field label="Team code">
@@ -1078,242 +1082,6 @@ const TeamTab = ({ user, showToast }) => {
   )
 }
 
-// IntegrationsTab — manage external service connections (Google Calendar today,
-// Microsoft Calendar / Slack / etc. in future). Each integration is its own card.
-const IntegrationsTab = ({ showToast }) => {
-  const [status, setStatus] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => { loadStatus() }, [])
-
-  // Re-check on focus, since the user may have come back from OAuth
-  useEffect(() => {
-    const onFocus = () => loadStatus()
-    window.addEventListener('focus', onFocus)
-    return () => window.removeEventListener('focus', onFocus)
-  }, [])
-
-  const loadStatus = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      if (!token) { setLoading(false); return }
-      const res = await fetch('/api/integrations/google/status', {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      const data = await res.json()
-      setStatus(data)
-    } catch (err) {
-      console.error('Failed to load integration status:', err)
-    }
-    setLoading(false)
-  }
-
-  const handleConnect = async () => {
-    // POST to /start with the bearer token in the header (never in the URL).
-    // The server returns the Google consent URL, then we redirect to it.
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session?.access_token) {
-      showToast('Sign in expired — refresh and try again', 'error')
-      return
-    }
-    setBusy(true)
-    try {
-      const res = await fetch('/api/integrations/google/start', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        showToast(data.error || 'Could not start Google connection', 'error')
-        setBusy(false)
-      }
-    } catch {
-      showToast('Could not start Google connection', 'error')
-      setBusy(false)
-    }
-  }
-
-  const handleDisconnect = async () => {
-    if (!confirm('Disconnect Google Calendar? Events Brikk created in your calendar will stay; future Brikk events won\'t sync.')) return
-    setBusy(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      await fetch('/api/integrations/google/disconnect', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      showToast('Google Calendar disconnected')
-      loadStatus()
-    } catch {
-      showToast('Disconnect failed', 'error')
-    }
-    setBusy(false)
-  }
-
-  const updateSettings = async (key, value) => {
-    if (!status?.connected) return
-    setBusy(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      const newSettings = { ...(status.sync_settings || {}), [key]: value }
-      const res = await fetch('/api/integrations/google/status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ sync_settings: newSettings }),
-      })
-      const data = await res.json()
-      if (data.sync_settings) {
-        setStatus({ ...status, sync_settings: data.sync_settings })
-      }
-    } catch {
-      showToast('Failed to update settings', 'error')
-    }
-    setBusy(false)
-  }
-
-  if (loading) {
-    return <Section title="Integrations"><div style={{ ...type.bodySub }}>Loading…</div></Section>
-  }
-
-  // Show the result banner from a recent OAuth callback
-  const oauthMessage = (() => {
-    if (typeof window === 'undefined') return null
-    const params = new URLSearchParams(window.location.search)
-    const status = params.get('google')
-    const messages = {
-      connected: 'Google Calendar connected.',
-      denied: 'Google access was denied. You can try again any time.',
-      bad_state: 'Connection security check failed. Please try again.',
-      token_exchange_failed: 'Google rejected our token exchange. Try connecting again.',
-      not_configured: 'Google integration is not configured by the admin.',
-      server_error: 'Server error during connection. Try again later.',
-      encryption_failed: 'Token storage failed — server configuration issue.',
-      db_error: 'Could not save integration. Try again.',
-    }
-    if (status && messages[status]) {
-      return { status, message: messages[status] }
-    }
-    return null
-  })()
-
-  return (
-    <>
-      <Section title="Connected accounts" description="Sync Brikk events to your calendar and other tools you already use.">
-        {oauthMessage && (
-          <div style={{
-            background: oauthMessage.status === 'connected' ? c.greenSoft : c.amberSoft,
-            border: `1px solid ${oauthMessage.status === 'connected' ? c.greenBorder : c.amberBorder || c.border}`,
-            color: oauthMessage.status === 'connected' ? c.green : c.amber,
-            borderRadius: 6, padding: '10px 14px', marginBottom: 14,
-            fontSize: 13, fontWeight: 500,
-          }}>
-            {oauthMessage.message}
-          </div>
-        )}
-
-        {/* Google Calendar card */}
-        <div style={{
-          ...card,
-          padding: '20px 22px',
-          display: 'flex', flexDirection: 'column', gap: 14,
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ fontSize: 22 }}>📅</span>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>Google Calendar</div>
-                  <div style={{ ...type.bodySub, fontSize: 12.5, marginTop: 2 }}>
-                    Sync birthdays, anniversaries, follow-ups, and deal milestones to your Google Calendar. Changes flow both ways.
-                  </div>
-                </div>
-              </div>
-            </div>
-            {status?.connected ? (
-              <button onClick={handleDisconnect} disabled={busy} style={{ ...btn.secondary, color: c.red, borderColor: 'rgba(190,18,60,0.2)' }}>
-                {busy ? 'Working…' : 'Disconnect'}
-              </button>
-            ) : (
-              <button onClick={handleConnect} disabled={busy} style={btn.primary}>
-                {busy ? 'Working…' : 'Connect Google Calendar'}
-              </button>
-            )}
-          </div>
-
-          {status?.connected && (
-            <>
-              <div style={{ paddingTop: 12, borderTop: `1px solid ${c.borderLight}`, fontSize: 12.5 }}>
-                <div style={{ color: c.sub }}>
-                  Connected as <strong style={{ color: c.text }}>{status.account_email || 'your Google account'}</strong>
-                </div>
-                <div style={{ color: c.dim, marginTop: 2 }}>
-                  {status.last_synced_at
-                    ? `Last sync: ${new Date(status.last_synced_at).toLocaleString()}`
-                    : 'Not yet synced — first sync runs within 15 minutes'}
-                </div>
-              </div>
-              <div style={{ paddingTop: 12, borderTop: `1px solid ${c.borderLight}` }}>
-                <div style={{ ...type.eyebrow, marginBottom: 10 }}>What to sync</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {[
-                    ['birthdays',       'Birthdays',       'Recurring annual reminder for each lead\'s birthday'],
-                    ['anniversaries',   'Home anniversaries', 'Recurring reminder for closed clients on their move-in date'],
-                    ['follow_ups',      'Follow-ups',      'One-time events for AI-suggested follow-up times'],
-                    ['deal_milestones', 'Deal milestones', 'Closing dates, inspection deadlines, appraisal dates'],
-                  ].map(([key, label, desc]) => (
-                    <label key={key} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                      <input
-                        type="checkbox"
-                        checked={status.sync_settings?.[key] !== false}
-                        onChange={(e) => updateSettings(key, e.target.checked)}
-                        disabled={busy}
-                        style={{ marginTop: 3 }}
-                      />
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
-                        <div style={{ ...type.meta, fontSize: 12 }}>{desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-      </Section>
-
-      <Section title="More integrations" description="Coming soon.">
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-          {[
-            { icon: '📨', name: 'Outlook Calendar', when: 'Q3 2026' },
-            { icon: '🔌', name: 'Zapier', when: 'Q3 2026' },
-            { icon: '📞', name: 'Zillow Tech Connect', when: 'Q4 2026' },
-            { icon: '✉️', name: 'Gmail lead capture', when: 'Q3 2026' },
-          ].map(item => (
-            <div key={item.name} style={{
-              padding: '14px 16px', background: c.bg,
-              border: `1px solid ${c.borderLight}`, borderRadius: 8,
-              display: 'flex', alignItems: 'center', gap: 10,
-            }}>
-              <span style={{ fontSize: 20 }}>{item.icon}</span>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</div>
-                <div style={{ ...type.meta, fontSize: 11 }}>{item.when}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </Section>
-    </>
-  )
-}
-
 const AgreementTab = () => (
   <>
     <Section title="Documents">
@@ -1324,8 +1092,8 @@ const AgreementTab = () => (
     </Section>
     <Section title="Acceptable use">
       <div style={{ ...type.bodySub }}>
-        By using Brikk you agree to use the service for legitimate real estate business. Review all AI-generated content before sending.
-        You are responsible for CAN-SPAM, TCPA, and local real estate compliance.
+        By using Brikk you agree to use the service for legitimate insurance business. Review every message before you send it.
+        You are responsible for TCPA, CAN-SPAM, state insurance regulations and your carriers’ marketing rules. Do not store health information in Brikk.
       </div>
     </Section>
   </>

@@ -9,6 +9,34 @@ dashboards, approvals).
 
 ---
 
+## Status (Nov 10, 2026)
+
+**Built:** 0.2–0.4, all of Phase 1–4, 5.1–5.10 (Book replaces the old Leads pages; Calendar removed),
+6.1–6.6, 7.1 (`API.md`). Also: security review fixes, Next.js 16 / React 19 upgrade, pricing
+changed to **$7.99/week after a 7-day free trial**, beneficiaries on policies, Google Calendar
+sync removed (git history has it).
+
+**Left:** 5.11 CSV import · 6.7 move old docs to `docs/archive/` · 6.8 rename · 6.9 drop old
+tables · 7.2 push notifications · 7.3 mobile hand-off guide · an "Upcoming 30 days" view.
+
+### Go-live checklist [Henry]
+1. Back up the database (Supabase → Database → Backups).
+2. Run, in order: `sql/sec-01-lock-down-profiles.sql`, `sql/li-01-households.sql`,
+   `sql/li-02-policies.sql`, `sql/li-03-follow-ups.sql`, `sql/li-04-backfill-from-leads.sql`.
+   Read the policy list printed by sec-01 and drop any dashboard-added policy that lets
+   `anon` / everyone read `profiles`, `deals` or `leads`.
+3. Stripe: create a **$7.99 / week** recurring price on the Pro product.
+4. Vercel env vars: set `STRIPE_PRICE_PRO` (new weekly price id), `CRON_SECRET`,
+   `ADMIN_EMAILS`; confirm `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`,
+   `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`. Remove `ANTHROPIC_API_KEY`, `TWILIO_*`,
+   `GOOGLE_OAUTH_*`, `INTEGRATIONS_ENCRYPTION_KEY`, `STATE_SIGNING_SECRET`.
+5. Vercel project settings: Node.js 20 or newer (Next.js 16 requirement).
+6. Merge this branch to `main` → Vercel deploys.
+7. Smoke test: sign up, add a household + policy, check Today, tap Text on a phone.
+
+Existing customers on the old $69.99/month price keep that Stripe subscription until they
+change it; only new checkouts use the weekly price.
+
 ## Decisions already made
 
 | Topic | Decision |

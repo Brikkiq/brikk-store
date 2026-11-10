@@ -86,4 +86,4 @@ mention it in your summary.
 
 ## Last updated
 
-Nov 10, 2026 — start of the life insurance conversion. Next step: PLAN.md Phase 0.
+Nov 10, 2026 — core conversion built (schema, /api/v1, Today, Book, timeline, schedule, Leads shell, launch page, security fixes). Pricing: $7.99/week after a 7-day trial. See PLAN.md "Status" for what is done and what is left.

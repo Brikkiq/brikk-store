@@ -2,45 +2,21 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/lib/client/api'
 import { c } from '@/lib/design'
 import { Logo } from '@/lib/Logo'
-import { ensureReferralCode } from '@/lib/referralCode'
-import { VoiceButton } from '@/lib/Voice'
 import { Onboarding } from '@/lib/Onboarding'
-import { getTrialState, shouldGate } from '@/lib/trial'
+import { shouldGate } from '@/lib/trial'
 
+// Same four sections on desktop and mobile.
 const navItems = [
-  { label: 'Today',         href: '/app',           key: 'home' },
-  { label: 'Copilot',       href: '/app/copilot',   key: 'copilot' },
-  { label: 'Leads',         href: '/app/leads',     key: 'leads' },
-  { label: 'Deals',         href: '/app/deals',     key: 'deals' },
-  { label: 'Calendar',      href: '/app/calendar',  key: 'calendar' },
-  { label: 'Conversations', href: '/app/messages',  key: 'messages' },
-  { label: 'Marketing',     href: '/app/marketing', key: 'marketing' },
+  { label: 'Today',    href: '/app',          key: 'home' },
+  { label: 'Book',     href: '/app/book',     key: 'book' },
+  { label: 'Leads',    href: '/app/leads',    key: 'leads' },
+  { label: 'Settings', href: '/app/settings', key: 'settings' },
 ]
 
-// Mobile bottom bar — all 8 sections present so nothing is hidden.
-// We use 8 tabs on a slightly taller bar; labels are short to keep them legible.
-const mobileNavItems = [
-  { label: 'Today',     href: '/app',           key: 'home' },
-  { label: 'Copilot',   href: '/app/copilot',   key: 'copilot' },
-  { label: 'Leads',     href: '/app/leads',     key: 'leads' },
-  { label: 'Deals',     href: '/app/deals',     key: 'deals' },
-  { label: 'Calendar',  href: '/app/calendar',  key: 'calendar' },
-  { label: 'Chats',     href: '/app/messages',  key: 'messages' },
-  { label: 'ROI',       href: '/app/marketing', key: 'marketing' },
-  { label: 'Settings',  href: '/app/settings',  key: 'settings' },
-]
-
-// If the current URL points at a single lead (e.g. /app/leads/abcd-1234),
-// surface that lead's identity so the voice modal can pre-tag actions.
-// The actual name resolution happens client-side in the voice modal via leads list.
-function detectLeadFromPath(path) {
-  if (!path) return null
-  const m = path.match(/^\/app\/leads\/([^\/?#]+)\/?$/)
-  if (m && m[1] && m[1] !== 'new') return { id: m[1] }
-  return null
-}
+const isActive = (path, href) => href === '/app' ? path === '/app' : path === href || path.startsWith(href + '/')
 
 const Icon = ({ name, size = 18 }) => {
   const props = {
@@ -56,6 +32,7 @@ const Icon = ({ name, size = 18 }) => {
   switch (name) {
     case 'home':      return <svg {...props}><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z"/></svg>
     case 'copilot':   return <svg {...props}><path d="M12 3v3"/><path d="M5 12H3"/><path d="M21 12h-2"/><path d="M5.6 5.6 7 7"/><path d="m17 7 1.4-1.4"/><circle cx="12" cy="13" r="6"/></svg>
+    case 'book':      return <svg {...props}><path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19v15H5.5A1.5 1.5 0 0 0 4 19.5z"/><path d="M4 19.5A1.5 1.5 0 0 0 5.5 21H19v-3"/><path d="M8 7h7"/></svg>
     case 'leads':     return <svg {...props}><circle cx="9" cy="8" r="3.5"/><path d="M2 21c0-3.6 3-6 7-6s7 2.4 7 6"/><path d="M17 11a3 3 0 0 0 0-6"/><path d="M22 21c0-2.8-1.6-5-4-5.7"/></svg>
     case 'deals':     return <svg {...props}><path d="M4 7h16v12H4z"/><path d="M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><path d="M9 12h6"/></svg>
     case 'calendar':  return <svg {...props}><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/></svg>
@@ -70,17 +47,13 @@ const Icon = ({ name, size = 18 }) => {
 export default function AppLayout({ children }) {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
-  const [team, setTeam] = useState(null)
+  const [trial, setTrial] = useState(null)
   const [loading, setLoading] = useState(true)
   const [currentPath, setCurrentPath] = useState('/app')
-  const [banner, setBanner] = useState(null)
-  const [bannerDismissed, setBannerDismissed] = useState(false)
-  const [liveAlerts, setLiveAlerts] = useState([])
   const touchStartY = useRef(0)
   const isPulling = useRef(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
-  const channelRef = useRef(null)
 
   useEffect(() => {
     let cancelled = false
@@ -88,53 +61,33 @@ export default function AppLayout({ children }) {
       if (cancelled) return
       if (!user) { window.location.href = '/login'; return }
       setUser(user)
-      const { data: prof } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+      let me = null
+      try { me = await api.get('/me') } catch (err) { console.warn('profile load failed', err?.message) }
       if (cancelled) return
-      setProfile(prof || null)
+      setProfile(me?.profile || null)
+      setTrial(me?.trial || null)
 
-      // Fetch team if user belongs to one — needed for trial-state resolution
-      let teamData = null
-      if (prof?.team_id) {
-        const { data: t } = await supabase.from('teams').select('*').eq('id', prof.team_id).maybeSingle()
-        teamData = t || null
-        setTeam(teamData)
-      }
-
-      // Trial gate — redirect to /app/upgrade when trial has expired and no paid plan.
-      // The upgrade page itself, plus settings billing tab + auth callbacks, stay reachable.
-      const trial = getTrialState({ profile: prof, team: teamData })
+      // Trial gate — the API also enforces this (HTTP 402); this just routes
+      // the user to the upgrade screen. Settings stays reachable.
       const path = typeof window !== 'undefined' ? window.location.pathname : ''
-      const isExempt =
-        path.startsWith('/app/upgrade') ||
-        path.startsWith('/app/settings')  // settings exempt so user can subscribe / sign out
-      if (shouldGate(trial.state) && !isExempt) {
+      const isExempt = path.startsWith('/app/upgrade') || path.startsWith('/app/settings')
+      if (me?.trial && shouldGate(me.trial.state) && !isExempt) {
         window.location.href = '/app/upgrade'
         return
       }
 
       setLoading(false)
-      // Make sure this user has a referral code. Cheap if they already do.
-      ensureReferralCode(user.id).catch(err => console.warn('referral code ensure failed', err?.message))
-      checkBanner(user.id).catch(err => console.warn('banner check failed', err?.message))
 
-      // If they signed up with a pending team code, redeem it now.
-      // We always clear the localStorage key after a single attempt — even on
-      // failure — so an invalid code doesn't keep retrying on every login.
-      // If the user wants to try again with a fresh code, they can use Settings → Team.
+      // Redeem a team code saved at signup (one attempt, then cleared).
       try {
-        const pending = typeof window !== 'undefined'
-          ? localStorage.getItem('brikk-pending-team-code')
-          : null
+        const pending = typeof window !== 'undefined' ? localStorage.getItem('brikk-pending-team-code') : null
         if (pending) {
           const session = (await supabase.auth.getSession()).data.session
           if (session?.access_token) {
             try {
               await fetch('/api/team', {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${session.access_token}`,
-                },
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
                 body: JSON.stringify({ action: 'join', team_code: pending }),
               })
             } catch (err) {
@@ -145,34 +98,6 @@ export default function AppLayout({ children }) {
           }
         }
       } catch {}
-
-      // Live alert: ping the agent whenever a new lead lands.
-      // Supabase Realtime — INSERT events on the leads table, filtered by user_id.
-      channelRef.current = supabase
-        .channel(`leads-inserts-${user.id}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'leads', filter: `user_id=eq.${user.id}` },
-          (payload) => {
-            const row = payload?.new
-            if (!row) return
-            // Only alert on inbound lead capture; suppress manual adds the user just did.
-            const isInbound = row.source === 'Referral Link' || row.source === 'Voice Note'
-            if (!isInbound) return
-            const tone = row.source === 'Referral Link' ? 'success' : 'info'
-            const msg = row.source === 'Referral Link'
-              ? `New lead: ${row.name} just filled out your link`
-              : `New lead: ${row.name}`
-            const alertId = row.id || Math.random().toString(36)
-            setLiveAlerts(prev => [...prev, { id: alertId, msg, tone }])
-            // Auto-dismiss after 8s
-            setTimeout(() => {
-              setLiveAlerts(prev => prev.filter(a => a.id !== alertId))
-            }, 8000)
-            if (window.brikk?.haptic) window.brikk.haptic('success')
-          }
-        )
-        .subscribe()
     })
     if (typeof window !== 'undefined') {
       setCurrentPath(window.location.pathname)
@@ -200,44 +125,8 @@ export default function AppLayout({ children }) {
     return () => {
       cancelled = true
       clearTimeout(t)
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
     }
   }, [])
-
-  const checkBanner = async (userId) => {
-    const [leadsRes, dealsRes] = await Promise.all([
-      supabase.from('leads').select('id,name,temperature,last_contact_date').eq('user_id', userId),
-      supabase.from('deals').select('id,address,close_date').eq('user_id', userId),
-    ])
-    const leads = leadsRes.data || []
-    const deals = dealsRes.data || []
-    const daysSince = (d) => d ? Math.floor((new Date() - new Date(d)) / 86400000) : 999
-    const daysUntil = (d) => d ? Math.ceil((new Date(d) - new Date()) / 86400000) : null
-
-    const hotOverdue = leads.filter(l => l.temperature === 'hot' && daysSince(l.last_contact_date) >= 2)
-    const closingSoon = deals.filter(d => d.close_date && daysUntil(d.close_date) <= 3 && daysUntil(d.close_date) >= 0)
-
-    if (hotOverdue.length) {
-      setBanner({
-        tone: 'urgent',
-        msg: `${hotOverdue.length} hot lead${hotOverdue.length > 1 ? 's' : ''} overdue — ${hotOverdue[0].name}${hotOverdue.length > 1 ? ' and others' : ''}`,
-        link: '/app/copilot',
-        linkLabel: 'Draft follow-ups',
-      })
-    } else if (closingSoon.length) {
-      const d = closingSoon[0]
-      const days = daysUntil(d.close_date)
-      setBanner({
-        tone: 'warn',
-        msg: `${d.address} closes in ${days} day${days === 1 ? '' : 's'}`,
-        link: '/app/deals',
-        linkLabel: 'Open deal',
-      })
-    }
-  }
 
   // Pull-to-refresh on mobile
   const handleTouchStart = (e) => {
@@ -273,18 +162,15 @@ export default function AppLayout({ children }) {
 
   const initials = (profile?.full_name || user?.email || '?').split(' ').filter(Boolean).map(s => s[0]).join('').slice(0, 2).toUpperCase()
   const firstName = profile?.full_name ? profile.full_name.split(' ')[0] : (user?.email || '').split('@')[0]
-  const bannerColor = banner?.tone === 'urgent' ? c.red : banner?.tone === 'warn' ? c.amber : c.indigo
-  const bannerBg = banner?.tone === 'urgent' ? c.redSoft : banner?.tone === 'warn' ? c.amberSoft : c.indigoSoft
 
   // Trial banner — separate from the activity banner. Persistent (not dismissable)
   // when the trial is winding down or payment failed.
-  const trial = getTrialState({ profile, team })
-  const showTrialBanner = trial.state === 'trialing' || trial.state === 'past_due'
-  const trialTone = trial.state === 'past_due' ? c.red
-                  : trial.daysLeft !== null && trial.daysLeft <= 3 ? c.amber
+  const showTrialBanner = trial?.state === 'trialing' || trial?.state === 'past_due'
+  const trialTone = trial?.state === 'past_due' ? c.red
+                  : trial?.daysLeft != null && trial.daysLeft <= 3 ? c.amber
                   : c.indigo
-  const trialBg = trial.state === 'past_due' ? c.redSoft
-                : trial.daysLeft !== null && trial.daysLeft <= 3 ? c.amberSoft
+  const trialBg = trial?.state === 'past_due' ? c.redSoft
+                : trial?.daysLeft != null && trial.daysLeft <= 3 ? c.amberSoft
                 : c.indigoSoft
 
   return (
@@ -336,12 +222,6 @@ export default function AppLayout({ children }) {
         @media (max-width: 900px) {
           .brikk-page-padding { padding: 16px 16px 96px !important; }
         }
-        /* Messages conversation takes over the whole screen on mobile */
-        @media (max-width: 900px) {
-          body.brikk-msg-fullscreen .brikk-mobile-top { display: none !important; }
-          body.brikk-msg-fullscreen .brikk-mobile-tabbar { display: none !important; }
-          body.brikk-msg-fullscreen .brikk-page-padding { padding: 0 !important; max-width: 100% !important; }
-        }
       `}</style>
 
       {/* Sidebar (desktop) */}
@@ -360,15 +240,15 @@ export default function AppLayout({ children }) {
       >
         <div style={{ padding: '20px 20px 16px' }}>
           <Logo size={18} />
-          <div style={{ fontSize: 11, color: c.dim, marginTop: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Command center</div>
+          <div style={{ fontSize: 11, color: c.dim, marginTop: 4, letterSpacing: '0.05em', textTransform: 'uppercase' }}>Client follow-ups</div>
         </div>
 
         <nav style={{ flex: 1, padding: '4px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {navItems.map(n => (
+          {navItems.filter(n => n.key !== 'settings').map(n => (
             <a
               key={n.href}
               href={n.href}
-              className={`brikk-nav-link ${currentPath === n.href ? 'active' : ''}`}
+              className={`brikk-nav-link ${isActive(currentPath, n.href) ? 'active' : ''}`}
             >
               <Icon name={n.key} size={17} />
               <span>{n.label}</span>
@@ -379,7 +259,7 @@ export default function AppLayout({ children }) {
         <div style={{ padding: 12, borderTop: `1px solid ${c.border}` }}>
           <a
             href="/app/settings"
-            className={`brikk-nav-link ${currentPath === '/app/settings' ? 'active' : ''}`}
+            className={`brikk-nav-link ${isActive(currentPath, '/app/settings') ? 'active' : ''}`}
           >
             <Icon name="settings" size={17} />
             <span>Settings</span>
@@ -428,42 +308,6 @@ export default function AppLayout({ children }) {
         <Logo size={18} />
       </header>
 
-      {/* Live alerts (Supabase Realtime — new leads) */}
-      {liveAlerts.length > 0 && (
-        <div style={{
-          position: 'fixed', top: 16, right: 16, zIndex: 300,
-          display: 'flex', flexDirection: 'column', gap: 8,
-          maxWidth: 340,
-        }}>
-          {liveAlerts.map(a => (
-            <div
-              key={a.id}
-              role="status"
-              style={{
-                background: a.tone === 'success' ? c.greenSoft : c.indigoSoft,
-                border: `1px solid ${a.tone === 'success' ? c.greenBorder : c.indigoBorder}`,
-                color: a.tone === 'success' ? c.green : c.indigo,
-                borderRadius: 8, padding: '12px 14px',
-                fontSize: 13, fontWeight: 500,
-                boxShadow: '0 6px 24px rgba(20,20,18,0.10)',
-                display: 'flex', alignItems: 'center', gap: 10,
-                animation: 'brikkFade 0.22s ease-out',
-              }}
-            >
-              <span style={{
-                width: 6, height: 6, borderRadius: '50%',
-                background: a.tone === 'success' ? c.green : c.indigo,
-                flexShrink: 0,
-              }} />
-              <span style={{ flex: 1, color: c.text }}>{a.msg}</span>
-              <a href="/app/leads" style={{ fontSize: 12, fontWeight: 600, color: a.tone === 'success' ? c.green : c.indigo, textDecoration: 'none' }}>
-                Open →
-              </a>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Main */}
       <div className="brikk-main" style={{ flex: 1, minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
         {(pullDistance > 0 || refreshing) && (
@@ -489,40 +333,13 @@ export default function AppLayout({ children }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: trialTone, flexShrink: 0 }} />
               <span style={{ fontSize: 13, fontWeight: 500, color: c.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {trial.message}
+                {trial?.message}
               </span>
             </div>
             <a
               href="/app/settings?tab=billing"
               style={{ fontSize: 12, fontWeight: 600, color: trialTone, textDecoration: 'none', flexShrink: 0 }}
             >Subscribe →</a>
-          </div>
-        )}
-
-        {banner && !bannerDismissed && (
-          <div style={{
-            background: bannerBg,
-            borderBottom: `1px solid ${bannerColor}33`,
-            padding: '10px 24px',
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            gap: 12,
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: bannerColor, flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 500, color: c.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {banner.msg}
-              </span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-              <a href={banner.link} style={{ fontSize: 12, fontWeight: 600, color: bannerColor, textDecoration: 'none' }}>
-                {banner.linkLabel} →
-              </a>
-              <button
-                onClick={() => setBannerDismissed(true)}
-                aria-label="Dismiss"
-                style={{ background: 'none', border: 'none', fontSize: 16, color: c.dim, cursor: 'pointer', padding: 4, lineHeight: 1 }}
-              >×</button>
-            </div>
           </div>
         )}
 
@@ -540,11 +357,8 @@ export default function AppLayout({ children }) {
         </main>
       </div>
 
-      {/* First-run onboarding — shows once for new accounts with zero leads */}
+      {/* First-run onboarding — shows once for new accounts with an empty Book */}
       <Onboarding />
-
-      {/* Floating voice button — available on every signed-in page */}
-      <VoiceButton leadHint={detectLeadFromPath(currentPath)} />
 
       {/* Mobile bottom tab bar — bigger, more comfortable thumb target */}
       <nav
@@ -562,8 +376,8 @@ export default function AppLayout({ children }) {
           alignItems: 'center',
         }}
       >
-        {mobileNavItems.map(n => {
-          const active = currentPath === n.href
+        {navItems.map(n => {
+          const active = isActive(currentPath, n.href)
           return (
             <a
               key={n.href}
@@ -575,6 +389,7 @@ export default function AppLayout({ children }) {
                 alignItems: 'center',
                 gap: 4,
                 padding: '6px 0',
+                minHeight: 44,
                 textDecoration: 'none',
                 color: active ? c.text : c.dim,
                 minWidth: 0,

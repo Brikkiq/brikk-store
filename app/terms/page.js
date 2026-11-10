@@ -16,32 +16,33 @@ export default function Terms(){
           <p>By creating an account or using Brikk, you agree to these Terms of Service. If you do not agree, do not use the service.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>2. Description of Service</h2>
-          <p>Brikk is an AI-powered command center for real estate agents. The service includes lead management, deal tracking, AI-drafted follow-up messages, smart calendar, marketing analytics, and SMS messaging capabilities.</p>
+          <p>Brikk is a client-management tool for life insurance agents. The service includes household and policy records, automatically scheduled follow-up reminders, birthday reminders, a daily task list, and pre-written text messages that you send from your own phone. Brikk does not store health or medical information, and you agree not to enter any.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>3. Account Registration</h2>
           <p>You must provide accurate information when creating your account. You are responsible for maintaining the security of your account credentials. You must be at least 18 years old to use Brikk.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>4. Pricing and Payment</h2>
-          <p>Brikk offers a 14-day free trial. After the trial period, the Pro plan is $69.99 per month and the Team plan is $160 per month. There is no setup fee. Prices may change with 30 days notice.</p>
+          <p>Brikk offers a 7-day free trial. After the trial period, the Pro plan is $7.99 per week, billed weekly. Existing team plans are billed at the price agreed when they were created. There is no setup fee. Prices may change with 30 days notice.</p>
           <p style={{marginTop:12,fontWeight:600,color:c.text}}>All sales are final. No refunds.</p>
-          <p style={{marginTop:8}}>By subscribing to Brikk, you acknowledge and agree that all payments are non-refundable, including but not limited to: monthly subscription fees, prorated charges, fees paid during an active billing cycle that you choose to cancel before the cycle ends, fees for periods of non-use, and fees paid for additional team seats. You are responsible for cancelling before your next billing date to avoid being charged for the following month. Cancellation stops future charges but does not refund any payment already made. The 14-day free trial exists so you can fully evaluate the product before committing — use it. Exceptions to this no-refund policy will only be granted where required by applicable law (such as statutory consumer-protection rights in certain jurisdictions, including but not limited to the European Union and California).</p>
+          <p style={{marginTop:8}}>By subscribing to Brikk, you acknowledge and agree that all payments are non-refundable, including but not limited to: weekly or monthly subscription fees, prorated charges, fees paid during an active billing cycle that you choose to cancel before the cycle ends, fees for periods of non-use, and fees paid for additional team seats. You are responsible for cancelling before your next billing date to avoid being charged for the following billing period. Cancellation stops future charges but does not refund any payment already made. The 7-day free trial exists so you can fully evaluate the product before committing — use it. Exceptions to this no-refund policy will only be granted where required by applicable law (such as statutory consumer-protection rights in certain jurisdictions, including but not limited to the European Union and California).</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>5. Acceptable Use</h2>
           <p>You agree not to use Brikk to:</p>
           <p style={{marginLeft:20}}>• Send unsolicited spam or bulk messages<br/>
-          • Violate any applicable laws including CAN-SPAM, TCPA, or real estate regulations<br/>
+          • Violate any applicable laws including CAN-SPAM, TCPA, state insurance regulations, or carrier marketing rules<br/>
+          • Store health, medical, or underwriting information about any person<br/>
           • Upload malicious content or attempt to access other users' data<br/>
           • Misrepresent your identity or affiliation<br/>
-          • Use the service for any purpose other than real estate business management</p>
+          • Use the service for any purpose other than managing your insurance business</p>
 
-          <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>6. AI-Generated Content</h2>
-          <p>Brikk uses AI to draft messages and provide insights. AI-generated content is suggestions only. You are responsible for reviewing and approving all messages before they are sent. Brikk is not liable for any consequences of AI-generated content that you approve and send.</p>
+          <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>6. Message Templates</h2>
+          <p>Brikk suggests message text from templates you can edit. Suggested text is a starting point only. You are responsible for reviewing every message before you send it and for making sure it complies with your carriers’ and state’s rules. Brikk is not liable for any consequences of messages you send.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>7. Messaging</h2>
           <p>Brikk does not send SMS messages on your behalf from our servers. Outbound texts are opened in your own phone's native messaging app and sent from your personal mobile number. You confirm that you have obtained proper consent from recipients before sending messages and that you are responsible for compliance with all applicable telecommunications laws — including the Telephone Consumer Protection Act (TCPA), CAN-SPAM, and any state-level rules.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>8. Data Ownership</h2>
-          <p>You retain ownership of all data you input into Brikk, including leads, deals, messages, and notes. Brikk has a license to use this data solely for providing and improving the service.</p>
+          <p>You retain ownership of all data you input into Brikk, including clients, household members, policies, follow-ups, and notes. Brikk has a license to use this data solely for providing and improving the service.</p>
 
           <h2 style={{fontSize:18,fontWeight:700,color:c.text,margin:"24px 0 8px"}}>9. Service Availability</h2>
           <p>We strive for 99.9% uptime but do not guarantee uninterrupted service. We may perform maintenance with reasonable notice. We are not liable for any loss resulting from service downtime.</p>

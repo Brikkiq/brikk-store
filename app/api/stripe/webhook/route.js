@@ -58,8 +58,8 @@ function resolvePlan(session, subscription) {
   // Fallback: infer from price (in dollars)
   const amount = subscription?.items?.data?.[0]?.price?.unit_amount
   // Match new pricing OR legacy fallback amounts.
-  if (amount === 16000 || amount === 20000) return 'team'   // $160 new, $200 legacy
-  if (amount === 6999  || amount === 7500)  return 'pro'    // $69.99 new, $75 legacy
+  if (amount === 16000 || amount === 20000) return 'team'   // legacy team prices
+  if (amount === 799 || amount === 6999 || amount === 7500) return 'pro'    // $7.99/week, legacy monthly
   return null
 }
 
@@ -156,6 +156,9 @@ async function updateProfileSubscription({ supabase, ownerId, plan, subscription
 }
 
 export async function POST(request) {
+  // Set once this event is recorded as processed, so a failure below can
+  // un-record it and let Stripe's retry run the handler again.
+  let recorded = null
   try {
     if (!STRIPE_WEBHOOK_SECRET) {
       console.error('Webhook rejected: STRIPE_WEBHOOK_SECRET not set')
@@ -177,6 +180,21 @@ export async function POST(request) {
 
     const event = JSON.parse(rawBody)
     const supabase = createClient(supabaseUrl, serviceKey)
+
+    // Idempotency: Stripe retries and can deliver the same event twice.
+    // Record the event id first; if it is already there, acknowledge and stop.
+    if (event?.id) {
+      const { error: dupErr } = await supabase
+        .from('processed_stripe_events')
+        .insert({ event_id: event.id, event_type: event.type })
+      if (dupErr) {
+        if (dupErr.code === '23505') return NextResponse.json({ ok: true, duplicate: true })
+        // Table missing (sql/sec-01 not run yet) or other error — process anyway.
+        console.warn('processed_stripe_events insert failed:', dupErr.message)
+      } else {
+        recorded = { supabase, id: event.id }
+      }
+    }
 
     // -------------------------------------------------- Checkout completed
     if (event.type === 'checkout.session.completed') {
@@ -300,7 +318,7 @@ export async function POST(request) {
         const { data: { user } } = await supabase.auth.admin.getUserById(profile.id)
         if (user?.email) {
           const plan = subscription.metadata?.plan || 'pro'
-          const priceLabel = plan === 'team' ? '$160/month' : '$69.99/month'
+          const priceLabel = plan === 'team' ? 'your team price' : '$7.99/week'
           const trialEndDate = subscription.trial_end
             ? new Date(subscription.trial_end * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
             : 'in 3 days'
@@ -308,14 +326,14 @@ export async function POST(request) {
           await sendEmail({
             fromName: 'Brikk',
             to: user.email,
-            subject: 'Your Brikk trial ends in 3 days',
+            subject: 'Your Brikk free trial ends soon',
             html: buildTrialEndingHtml({
               firstName: (profile.full_name || '').split(' ')[0] || 'there',
               plan: plan === 'team' ? 'Team' : 'Pro',
               priceLabel,
               trialEndDate,
             }),
-            text: `Hi ${(profile.full_name || '').split(' ')[0] || 'there'},\n\nYour 14-day Brikk trial ends ${trialEndDate}. Your card will be charged ${priceLabel} on that date and your subscription will continue automatically.\n\nTo cancel before then, go to Settings → Billing → Open billing portal at https://brikk.store/app/settings.\n\nAll sales are final once charged — see https://brikk.store/terms.\n\nThanks,\nBrikk`,
+            text: `Hi ${(profile.full_name || '').split(' ')[0] || 'there'},\n\nYour 7-day Brikk free trial ends ${trialEndDate}. Your card will be charged ${priceLabel} on that date and your subscription will continue automatically.\n\nTo cancel before then, go to Settings → Billing → Open billing portal at https://brikk.store/app/settings.\n\nAll sales are final once charged — see https://brikk.store/terms.\n\nThanks,\nBrikk`,
           })
         }
       }
@@ -352,6 +370,9 @@ export async function POST(request) {
     return NextResponse.json({ ok: true, event: event.type, handled: false })
   } catch (err) {
     console.error('Stripe webhook error:', err?.message)
+    if (recorded) {
+      try { await recorded.supabase.from('processed_stripe_events').delete().eq('event_id', recorded.id) } catch {}
+    }
     return NextResponse.json({ error: 'Webhook handler error' }, { status: 500 })
   }
 }
@@ -375,10 +396,10 @@ function buildTrialEndingHtml({ firstName, plan, priceLabel, trialEndDate }) {
               Your trial ends ${trialEndDate}, ${firstName}.
             </h1>
             <p style="font-size:14px;line-height:1.65;color:#1A1A18;margin:0 0 16px 0;">
-              Quick heads-up: your 14-day Brikk trial ends ${trialEndDate}. Your card on file will be charged <strong>${priceLabel}</strong> for the ${plan} plan and your subscription will continue automatically.
+              Quick heads-up: your 7-day Brikk free trial ends ${trialEndDate}. Your card on file will be charged <strong>${priceLabel}</strong> for the ${plan} plan and your subscription will continue automatically.
             </p>
             <p style="font-size:14px;line-height:1.65;color:#1A1A18;margin:0 0 20px 0;">
-              If Brikk's been helping you close more deals, no action needed — we'll keep going. If you want to stop, you can cancel anytime before ${trialEndDate} from Settings → Billing.
+              If Brikk's been helping you keep up with your clients, no action needed — we'll keep going. If you want to stop, you can cancel anytime before ${trialEndDate} from Settings → Billing.
             </p>
             <p style="margin:0 0 24px 0;">
               <a href="https://brikk.store/app/settings" style="display:inline-block;background:#1A1A18;color:#FFFFFF;text-decoration:none;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;">Open billing settings</a>
@@ -392,7 +413,7 @@ function buildTrialEndingHtml({ firstName, plan, priceLabel, trialEndDate }) {
           </td></tr>
           <tr><td style="padding:18px 32px;border-top:1px solid #F0F0EC;">
             <p style="font-size:11px;line-height:1.5;color:#9C9C96;margin:0;">
-              Brikk · <a href="https://brikk.store" style="color:#6B6B66;text-decoration:none;">brikk.store</a> · Built to close
+              Brikk · <a href="https://brikk.store" style="color:#6B6B66;text-decoration:none;">brikk.store</a>
             </p>
           </td></tr>
         </table>

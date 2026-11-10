@@ -19,14 +19,16 @@ const anonKey     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 // Stripe Dashboard. Until then, leaving this off avoids 400 errors at checkout.
 const ENABLE_STRIPE_TAX = process.env.STRIPE_ENABLE_TAX === 'true'
 
-// Stripe Price IDs come from env vars so Henry can swap to new prices in
-// Stripe Dashboard without a code deploy. Fallbacks are the original prices.
-// IMPORTANT: setup fees were removed in May 2026 — only monthly subscriptions
-// are billed now. See PRICING-CHANGE.md.
+// Stripe Price IDs come from env vars only — no hardcoded fallbacks, so a
+// missing variable fails loudly instead of silently charging an old price.
+// Pro = $7.99/week recurring price (Nov 2026 pricing).
+// TODO(henry): create the $7.99/week recurring price in Stripe and set
+// STRIPE_PRICE_PRO to its price_... id in Vercel. STRIPE_PRICE_TEAM is optional.
 const PRICES = {
-  pro:  process.env.STRIPE_PRICE_PRO  || 'price_1TMALg2MsBrmQDSseFz1jgY4',  // legacy fallback ($75/mo)
-  team: process.env.STRIPE_PRICE_TEAM || 'price_1TMAOF2MsBrmQDSsosNK9PDd',  // legacy fallback ($200/mo)
+  pro:  process.env.STRIPE_PRICE_PRO  || null,
+  team: process.env.STRIPE_PRICE_TEAM || null,
 }
+const TRIAL_DAYS = 7
 
 export async function POST(request) {
   try {
@@ -55,8 +57,12 @@ export async function POST(request) {
     const email = user.email || ''
 
     const { plan } = await request.json()
-    if (!plan || !PRICES[plan]) {
+    if (plan !== 'pro' && plan !== 'team') {
       return NextResponse.json({ error: 'Invalid plan' }, { status: 400 })
+    }
+    if (!PRICES[plan]) {
+      console.error(`Checkout blocked: STRIPE_PRICE_${plan.toUpperCase()} is not set`)
+      return NextResponse.json({ error: 'Billing is not configured yet. Please contact hello@brikk.store.' }, { status: 503 })
     }
 
     const monthlyPriceId = PRICES[plan]
@@ -80,7 +86,7 @@ export async function POST(request) {
       cancel_url:  `${APP_URL}/app/settings?payment=cancelled`,
       customer_email: email || '',
       client_reference_id: userId || '',
-      'subscription_data[trial_period_days]': '14',
+      'subscription_data[trial_period_days]': String(TRIAL_DAYS),
       'line_items[0][price]': monthlyPriceId,
       'line_items[0][quantity]': '1',
       allow_promotion_codes: 'true',

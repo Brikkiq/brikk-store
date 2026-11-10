@@ -16,57 +16,35 @@ const c = {
 // customer feedback. Public roadmap = strong trust signal that the product is
 // actively developed.
 
+// Only list something as shipped when its UI actually exists.
 const SHIPPED = [
-  { title: 'AI Copilot drafts', detail: 'Claude-powered follow-up message generation with context per lead.' },
-  { title: 'Voice-to-CRM', detail: 'Tap mic, talk naturally — AI parses voice notes into structured updates.' },
-  { title: 'Lead pipeline', detail: 'Temperature tracking, custom fields, source attribution.' },
-  { title: 'Deal tracker', detail: 'Contract to closing with progress stages and commission tracking.' },
-  { title: 'Smart calendar', detail: 'Auto-populated from leads and deals with AI context per event.' },
-  { title: 'Lead capture link', detail: 'Personal /r/CODE URL for business cards and Instagram.' },
-  { title: 'CSV lead import', detail: 'Upload CSV from Zillow, Realtor.com, or any spreadsheet. AI guesses column mapping.' },
-  { title: 'Marketing ROI', detail: 'Which sources actually produce closings, with AI insight callouts.' },
-  { title: 'Morning brief email', detail: 'Personalized daily digest of what needs attention today.' },
-  { title: 'Birthday reminders', detail: 'High-touch low-effort relationship moments surfaced automatically.' },
-  { title: 'Home anniversary reminders', detail: 'Closing-anniversary action cards for closed clients — relationship glue most CRMs ignore.' },
-  { title: 'Cold deal detection', detail: 'Proactive alerts when a deal stalls or passes its expected close date.' },
-  { title: 'Deal risk scoring', detail: 'Heuristic flags for deals at higher risk of falling apart.' },
-  { title: 'Sentiment analysis', detail: 'AI tags inbound messages as warm / cool / frustrated so you know who\'s cooling off.' },
-  { title: 'Best-time-to-contact', detail: 'AI suggests when each lead is most likely to reply based on their message history.' },
-  { title: 'Lead-to-deal linking', detail: 'Auto-sync deal client info when the underlying lead is updated.' },
-  { title: 'Client deal tracker', detail: 'Public link your buyer/seller can check anytime — eliminates "where are we?" calls.' },
-  { title: 'Referral ledger', detail: 'Track every referral given and received with commission outcomes.' },
-  { title: 'Commission goal pacing', detail: 'Set annual target. See "X leads needed at your conversion rate" to hit it.' },
-  { title: 'Missed-call auto-text', detail: 'One-tap "just missed you, calling back" follow-up from any lead detail.' },
-  { title: 'Google Calendar sync', detail: 'Two-way sync of birthdays, anniversaries, follow-ups, and deal milestones.' },
-  { title: 'Customer Portal', detail: 'Self-serve subscription management — update card, cancel, view invoices.' },
-  { title: 'Stripe Checkout + Apple Pay', detail: '14-day trial, Apple Pay / Google Pay / Link / Cards.' },
+  { title: 'Household Book', detail: 'Policyholder, spouse and kids in one record, each with their own birthday.' },
+  { title: 'Policy basics', detail: 'Carrier, product, face amount, premium, application / effective / first draft dates and beneficiary names. No health info.' },
+  { title: 'Automatic follow-up schedule', detail: 'Thank-you, pre-draft, payment check, 30/60/90-day and 6-month follow-ups generated from each policy’s dates.' },
+  { title: 'Annual reviews', detail: 'A review reminder on every policy anniversary, every year.' },
+  { title: 'Family birthday reminders', detail: 'For every member of every household.' },
+  { title: 'Today dashboard', detail: 'Overdue, today and this week — with one-tap texts from your own phone and a “Did you send it?” check.' },
+  { title: 'Client timeline', detail: 'Everything done and coming up for a household, in one list.' },
+  { title: 'Editable schedule', detail: 'Change timing and wording of every step, add your own, or switch steps off.' },
+  { title: 'Lead capture link', detail: 'Share a link; submissions land in your Book as prospects.' },
+  { title: 'Morning email', detail: 'A daily email listing who to contact today.' },
 ]
 
 const IN_PROGRESS = [
-  { title: 'iOS native app', detail: 'App Store submission via Capacitor wrapper. Same web codebase, native shell.', eta: 'Q2 2026' },
-  { title: 'Android native app', detail: 'Google Play submission to follow iOS launch.', eta: 'Q2 2026' },
-  { title: 'Listing prep checklist UI', detail: 'Auto-generated tasks for each seller deal (photos, staging, MLS input, disclosures).', eta: 'This week' },
-  { title: 'Offer comparison sheet', detail: 'Multi-offer entry + visual comparison + AI commentary for sellers.', eta: 'This week' },
+  { title: 'iPhone and Android apps', detail: 'Native apps built on the same backend as the web app.', eta: 'Next' },
+  { title: 'Lead store', detail: 'Buy life insurance leads inside Brikk; they drop into your Book with follow-ups ready.', eta: 'Next' },
 ]
 
 const PLANNED = [
-  { title: 'Two-way Google Calendar sync', detail: 'Brikk events show up in your Google Calendar and vice versa. OAuth + background sync.' },
-  { title: 'Two-way Outlook Calendar sync', detail: 'Same as Google sync but for Microsoft 365 / Outlook users.' },
-  { title: 'Email-forwarding lead import', detail: 'Forward your Zillow / Realtor.com lead emails to a Brikk inbox. AI parses + auto-creates leads.' },
-  { title: 'Buying intent signals', detail: 'Detect when a lead reopens a listing link, asks a price question, or shows urgency — alert agent in real time.' },
-  { title: 'Listings module', detail: 'First-class Property entity with multi-buyer tracking, showing schedule, and offer tracking per listing.' },
-  { title: 'Team chat', detail: 'Internal messaging between team members — share leads, deals, notes without leaving Brikk.' },
-  { title: 'Push notifications (iOS + Android)', detail: 'Real-time alerts for new leads, replies, hot signals — even when the app is closed.' },
-  { title: 'Document storage per lead', detail: 'Attach contracts, pre-approvals, inspection reports to a lead or deal.' },
-  { title: 'Commission goal tracker', detail: 'Set annual goal, track progress, see what closing rate you need to hit it.' },
+  { title: 'Push notifications', detail: 'A morning nudge with how many people to contact today.' },
+  { title: 'CSV import', detail: 'Bring your existing book in from a spreadsheet.' },
+  { title: 'Upcoming 30 days view', detail: 'A look-ahead list of every follow-up and birthday in the next month.' },
+  { title: 'Calendar sync', detail: 'Follow-ups and birthdays in Google or Outlook Calendar.' },
 ]
 
 const REQUESTED = [
-  { title: 'Zillow Tech Connect integration', detail: 'Direct API connection to Zillow leads — requires partner program approval. Watching status.' },
-  { title: 'MLS direct integration', detail: 'IDX / RETS feeds for live listing data inside Brikk. Requires per-MLS membership and credentials.' },
-  { title: 'DocuSign / Dotloop integration', detail: 'Send and track e-signatures directly from a deal page.' },
-  { title: 'AI cold-call coaching', detail: 'Record a call, AI gives feedback on objection handling and next-step suggestions.' },
-  { title: 'Brokerage-level analytics', detail: 'For Agency plan: aggregate stats across all team members, leaderboard, conversion rates.' },
+  { title: 'Carrier commission tracking', detail: 'Track advances and chargeback windows per policy.' },
+  { title: 'Team / agency view', detail: 'Agency owners see follow-up activity across their agents.' },
 ]
 
 const Section = ({ label, color, bg, border, items, showEta }) => (

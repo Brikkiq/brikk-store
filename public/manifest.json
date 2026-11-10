@@ -1,7 +1,7 @@
 {
   "name": "Brikk — Built to Close",
   "short_name": "Brikk",
-  "description": "The command center for real estate agents.",
+  "description": "Follow-ups for life insurance agents.",
   "start_url": "/app",
   "display": "standalone",
   "background_color": "#FAFAF9",

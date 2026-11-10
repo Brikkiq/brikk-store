@@ -1,409 +1,118 @@
 'use client'
+// Today — who the agent needs to contact, with one-tap texting.
+// All logic lives in GET /api/v1/today; this page only renders it.
+import { useCallback, useEffect, useState } from 'react'
+import { api } from '@/lib/client/api'
+import { c, type, btn, statTile } from '@/lib/design'
+import { FollowUpCard, SectionLabel, Loading, ErrorBox, Empty, money } from '@/lib/ui'
+import { longDate } from '@/lib/core/dates'
 
-import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { c, type, card, statTile, btn, chipFor, fmt } from '@/lib/design'
-import { findUpcomingBirthdays, birthdayLabel, birthdayMessageDraft } from '@/lib/birthdays'
+export default function TodayPage() {
+  const [data, setData] = useState(null)
+  const [me, setMe] = useState(null)
+  const [error, setError] = useState(null)
+  const [showWeek, setShowWeek] = useState(true)
 
-export default function AppOverview() {
-  const [leads, setLeads] = useState([])
-  const [deals, setDeals] = useState([])
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [dismissedActions, setDismissedActions] = useState([])
-
-  useEffect(() => {
-    loadData()
-    // Refresh when voice modal applies actions globally
-    const handler = () => loadData()
-    if (typeof window !== 'undefined') window.addEventListener('brikk:voice-saved', handler)
-    return () => { if (typeof window !== 'undefined') window.removeEventListener('brikk:voice-saved', handler) }
-  }, [])
-
-  const loadData = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+  const load = useCallback(async () => {
+    setError(null)
     try {
-      const [leadsRes, dealsRes, profileRes] = await Promise.all([
-        supabase.from('leads').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('deals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('profiles').select('*').eq('id', user.id).single(),
-      ])
-      setLeads(leadsRes.data || [])
-      setDeals(dealsRes.data || [])
-      setProfile(profileRes.data)
-    } catch (err) {
-      console.error('Dashboard load failed:', err?.message)
+      const [today, profile] = await Promise.all([api.get('/today'), me ? Promise.resolve(me) : api.get('/me')])
+      setData(today)
+      setMe(profile)
+    } catch (e) {
+      setError(e.message)
     }
-    setLoading(false)
-  }
+  }, [me])
 
-  const handleLogContact = async (leadId) => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    await supabase.from('leads').update({
-      last_contact_date: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }).eq('id', leadId)
-    await supabase.from('interactions').insert({
-      user_id: user.id, lead_id: leadId,
-      interaction_type: 'contact', notes: 'Quick action: logged contact',
-    })
-    setDismissedActions(prev => [...prev, `lead-${leadId}`])
-    loadData()
-  }
+  useEffect(() => { load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // --- Build action list ---
-  const actions = []
+  // Coming back from the Messages app: refresh so "Did you send it?" shows.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [load])
 
-  leads.forEach(l => {
-    const days = fmt.daysSince(l.last_contact_date) ?? 999
-    if (l.temperature === 'hot' && days >= 1) {
-      actions.push({
-        id: `lead-${l.id}`,
-        priority: days >= 3 ? 'critical' : 'high',
-        category: 'Follow up',
-        title: `Reach out to ${l.name}`,
-        subtitle: `Hot ${l.lead_type || 'lead'} · ${days}d since contact`,
-        meta: [l.stage, l.price_range].filter(Boolean).join(' · '),
-        tone: days >= 3 ? 'urgent' : 'warn',
-        primaryLabel: 'Log contact',
-        primaryFn: () => handleLogContact(l.id),
-        secondaryHref: '/app/messages',
-        secondaryLabel: 'Open conversation',
-      })
-    } else if (l.temperature === 'warm' && days >= 3) {
-      actions.push({
-        id: `lead-${l.id}`,
-        priority: days >= 7 ? 'high' : 'medium',
-        category: 'Follow up',
-        title: `Check in with ${l.name}`,
-        subtitle: `Warm lead · ${days}d since contact${days >= 7 ? ' — going cold' : ''}`,
-        meta: [l.stage, l.price_range].filter(Boolean).join(' · '),
-        tone: days >= 7 ? 'urgent' : 'warn',
-        primaryLabel: 'Log contact',
-        primaryFn: () => handleLogContact(l.id),
-        secondaryHref: '/app/messages',
-        secondaryLabel: 'Open conversation',
-      })
-    }
-  })
+  if (error && !data) return <ErrorBox message={error} onRetry={load} />
+  if (!data) return <Loading label="Loading your day…" />
 
-  deals.forEach(d => {
-    if (!d.close_date) return
-    const left = fmt.daysUntil(d.close_date)
-    if (left === null || left > 14 || left < -3) return
-    actions.push({
-      id: `deal-${d.id}`,
-      priority: left <= 3 ? 'critical' : left <= 7 ? 'high' : 'medium',
-      category: 'Closing',
-      title: d.address,
-      subtitle:
-        left <= 0 ? 'Closes today or overdue — confirm signatures and funds'
-        : left <= 3 ? `Closes in ${left} day${left === 1 ? '' : 's'} — confirm clear-to-close`
-        : left <= 7 ? `${left} days to close — verify lender and title`
-        : `${left} days to close — on track`,
-      meta: [d.client_name, d.price ? fmt.money(d.price) : null, d.commission ? `Commission ${fmt.money(d.commission)}` : null]
-        .filter(Boolean).join(' · '),
-      tone: left <= 3 ? 'urgent' : left <= 7 ? 'warn' : 'info',
-      secondaryHref: '/app/deals',
-      secondaryLabel: 'Open deal',
-    })
-  })
-
-  // ---- Proactive intelligence: detect deals quietly going cold ----
-  // A deal is "going cold" if it hasn't been updated in 14+ days OR it's past
-  // its expected close date by more than 3 days without being marked Closed.
-  // These often slip through the cracks because nothing else flags them.
-  deals.forEach(d => {
-    if (d.stage === 'Closed') return
-    const daysSinceUpdate = fmt.daysSince(d.updated_at) ?? 0
-    const daysPastClose = d.close_date ? -fmt.daysUntil(d.close_date) : null
-    const isStalledByActivity = daysSinceUpdate >= 14
-    const isPastClose = daysPastClose !== null && daysPastClose > 3
-    // Skip if the deal will already be flagged by the closing-window logic above
-    const left = d.close_date ? fmt.daysUntil(d.close_date) : null
-    const alreadyFlagged = left !== null && left <= 14 && left >= -3
-    if (alreadyFlagged) return
-    if (!isStalledByActivity && !isPastClose) return
-    let subtitle
-    if (isPastClose) {
-      subtitle = `Past expected close date by ${daysPastClose} days — confirm status or push the date`
-    } else {
-      subtitle = `${daysSinceUpdate}d since any update — nudge before it slips`
-    }
-    actions.push({
-      id: `cold-deal-${d.id}`,
-      priority: 'medium',
-      category: 'Deal cooling',
-      title: d.address,
-      subtitle,
-      meta: [d.client_name, d.stage, d.price ? fmt.money(d.price) : null]
-        .filter(Boolean).join(' · '),
-      tone: 'warn',
-      secondaryHref: '/app/deals',
-      secondaryLabel: 'Open deal',
-    })
-  })
-
-  const leadsNeedingFollowUp = leads.filter(l => {
-    const d = fmt.daysSince(l.last_contact_date) ?? 999
-    return (l.temperature === 'hot' && d >= 1) || (l.temperature === 'warm' && d >= 3) || (l.temperature === 'cold' && d >= 7)
-  }).length
-
-  if (leadsNeedingFollowUp > 0) {
-    actions.push({
-      id: 'copilot',
-      priority: 'medium',
-      category: 'Copilot',
-      title: `${leadsNeedingFollowUp} draft${leadsNeedingFollowUp === 1 ? '' : 's'} ready to review`,
-      subtitle: 'AI-written follow-ups awaiting your approval',
-      tone: 'info',
-      secondaryHref: '/app/copilot',
-      secondaryLabel: 'Open Copilot',
-    })
-  }
-
-  // ---- Deal risk scoring ----
-  // Heuristic flag for transactions that statistically fall apart:
-  // - First-time buyer (heuristic: source includes "first-time" or notes mention "first time")
-  // - Long close window (>45 days out gives more time for things to go sideways)
-  // - Stalled mid-pipeline (Inspection/Appraisal/Financing for 10+ days)
-  // These don't have to be perfect — they just flag attention before agents lose deals.
-  deals.forEach(d => {
-    if (d.stage === 'Closed' || d.stage === 'Contract') return
-    const riskFactors = []
-    const left = d.close_date ? fmt.daysUntil(d.close_date) : null
-    if (left !== null && left > 45) riskFactors.push('long close window (' + left + 'd)')
-    const daysInStage = fmt.daysSince(d.updated_at) ?? 0
-    if (['Inspection', 'Appraisal', 'Financing'].includes(d.stage) && daysInStage >= 10) {
-      riskFactors.push(`${daysInStage}d stalled at ${d.stage}`)
-    }
-    const notes = (d.notes || '').toLowerCase()
-    if (notes.includes('first-time') || notes.includes('first time')) {
-      riskFactors.push('first-time buyer')
-    }
-    if (riskFactors.length < 2) return  // only surface if at least 2 risk factors
-    actions.push({
-      id: `risk-deal-${d.id}`,
-      priority: 'medium',
-      category: 'Deal at risk',
-      title: d.address,
-      subtitle: `Risk signals: ${riskFactors.join(', ')} — check in proactively before something cracks`,
-      meta: [d.client_name, d.stage, d.price ? fmt.money(d.price) : null].filter(Boolean).join(' · '),
-      tone: 'warn',
-      secondaryHref: '/app/deals',
-      secondaryLabel: 'Open deal',
-    })
-  })
-
-  // ---- Home anniversary reminders ----
-  // For closed deals, surface the closing anniversary (1-year, 2-year, etc.)
-  // High-touch low-effort relationship glue. Most CRMs abandon this entirely.
-  const todayDate = new Date()
-  deals.forEach(d => {
-    if (d.stage !== 'Closed' || !d.close_date) return
-    const closeD = new Date(d.close_date)
-    const yearsSince = todayDate.getFullYear() - closeD.getFullYear()
-    if (yearsSince < 1) return
-    // Same month + day = anniversary; also surface +/- 3 days for grace
-    const monthMatch = todayDate.getMonth() === closeD.getMonth()
-    const dayDiff = Math.abs(todayDate.getDate() - closeD.getDate())
-    if (!monthMatch || dayDiff > 3) return
-    const draftText = `Hi ${(d.client_name || '').split(' ')[0] || 'there'}, can't believe it's been ${yearsSince} year${yearsSince === 1 ? '' : 's'} since you moved into ${d.address}! Hope it still feels like home. Let me know if I can ever help with anything — referrals, market updates, you name it.`
-    actions.push({
-      id: `anniversary-${d.id}`,
-      priority: 'medium',
-      category: 'Anniversary',
-      title: `🏡 ${d.client_name || d.address} — ${yearsSince} year${yearsSince === 1 ? '' : 's'} in their home`,
-      subtitle: `Reach out today — high-impact relationship moment, almost no agent does this.`,
-      meta: d.address,
-      tone: 'info',
-      primaryLabel: 'Send anniversary message',
-      primaryHref: `sms:?&body=${encodeURIComponent(draftText)}`,
-      secondaryHref: '/app/deals',
-      secondaryLabel: 'Open deal',
-    })
-  })
-
-  // Birthday alerts — surface today + next 7 days as action cards.
-  // Touching a client's birthday is one of the highest-ROI moments an agent
-  // can engineer; missing it is the most damaging.
-  const upcomingBirthdays = findUpcomingBirthdays(leads, 7)
-  upcomingBirthdays.forEach(l => {
-    const label = birthdayLabel(l)
-    const draftMsg = encodeURIComponent(birthdayMessageDraft(l.name, l.isToday))
-    const phoneClean = l.phone ? String(l.phone).replace(/[^0-9+]/g, '') : null
-    actions.push({
-      id: `birthday-${l.id}`,
-      priority: l.isToday ? 'high' : l.daysUntil <= 2 ? 'medium' : 'low',
-      category: 'Birthday',
-      title: `🎂 ${l.name}`,
-      subtitle: label,
-      meta: l.lead_type ? `${l.lead_type} · ${l.temperature || 'lead'}` : (l.temperature || 'lead'),
-      tone: l.isToday ? 'celebrate' : 'info',
-      primaryLabel: phoneClean ? 'Text birthday wish' : null,
-      primaryHref: phoneClean ? `sms:${phoneClean}?&body=${draftMsg}` : null,
-      secondaryHref: `/app/leads/${l.id}`,
-      secondaryLabel: 'Open lead',
-    })
-  })
-
-  const priorityOrder = { critical: 0, high: 1, medium: 2, low: 3 }
-  actions.sort((a, b) => (priorityOrder[a.priority] || 3) - (priorityOrder[b.priority] || 3))
-  const pending = actions.filter(a => !dismissedActions.includes(a.id))
-
-  const totalCommission = deals.reduce((s, d) => s + (d.commission || 0), 0)
+  const firstName = (me?.profile?.full_name || '').split(' ')[0]
   const hour = new Date().getHours()
-  const greeting = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'
-  const firstName = profile?.full_name ? profile.full_name.split(' ')[0] : ''
-
-  if (loading) {
-    return <div style={{ padding: 60, textAlign: 'center', color: c.dim, fontSize: 13 }}>Loading your day…</div>
-  }
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const s = data.stats
+  const mainCount = data.overdue.length + data.today.length
+  const isEmptyBook = s.clients === 0 && mainCount === 0 && data.this_week.length === 0
 
   return (
     <div>
-      {/* Header */}
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ ...type.pageTitle, margin: 0 }}>
-          Good {greeting}{firstName ? `, ${firstName}` : ''}.
-        </h1>
-        <p style={{ ...type.bodySub, margin: '4px 0 0' }}>
-          {pending.length === 0
-            ? "You're all caught up."
-            : pending.length === 1
-              ? '1 item needs your attention today.'
-              : `${pending.length} items need your attention today.`}
-        </p>
-      </div>
-
-      {/* KPI row */}
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 28 }}>
-        <KPI label="Open actions" value={pending.length} accent={pending.length > 0 ? c.amber : c.green} />
-        <KPI label="Active leads" value={leads.length} />
-        <KPI label="Deals in flight" value={deals.length} accent={c.green} />
-        <KPI label="Pending commission" value={fmt.moneyK(totalCommission)} accent={c.green} />
-      </div>
-
-      {/* Actions */}
-      <section style={{ marginBottom: 32 }}>
-        <SectionHeader label="Today's actions" />
-        {pending.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {pending.map(a => <ActionRow key={a.id} action={a} onDismiss={() => setDismissedActions(p => [...p, a.id])} />)}
-          </div>
-        ) : (
-          <EmptyState
-            isFresh={leads.length === 0 && deals.length === 0}
-          />
-        )}
-      </section>
-
-      {/* Quick links */}
-      <section>
-        <SectionHeader label="Jump to" />
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 8 }}>
-          <QuickLink href="/app/copilot"   label="Copilot"      sub="AI follow-ups" />
-          <QuickLink href="/app/calendar"  label="Calendar"     sub="Today + upcoming" />
-          <QuickLink href="/app/marketing" label="Marketing"    sub="ROI by source" />
-          <QuickLink href="/app/leads"     label="Add a lead"   sub="Capture a prospect" />
-          <QuickLink href="/app/deals"     label="Log a deal"   sub="Under contract" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ ...type.pageTitle, margin: 0 }}>{greeting}{firstName ? `, ${firstName}` : ''}.</h1>
+          <p style={{ ...type.bodySub, margin: '4px 0 0' }}>
+            {longDate(data.date)} · {mainCount === 0 ? 'Nobody to contact right now.' : `${mainCount} ${mainCount === 1 ? 'person' : 'people'} to contact.`}
+          </p>
         </div>
-      </section>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <a href="/app/book/new" style={{ ...btn.primary, textDecoration: 'none', minHeight: 44 }}>+ Add client</a>
+          <a href="/app/book?pick=policy" style={{ ...btn.secondary, textDecoration: 'none', minHeight: 44 }}>+ Add policy</a>
+        </div>
+      </div>
 
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 26 }}>
+        <Stat label="Due today" value={s.due_today} accent={s.due_today ? c.amber : c.green} />
+        <Stat label="Overdue" value={s.overdue} accent={s.overdue ? c.red : c.text} />
+        <Stat label="Done this week" value={s.done_this_week} accent={c.green} />
+        <Stat label="Active policies" value={s.active_policies} sub={s.pending_policies ? `${s.pending_policies} pending` : null} />
+        <Stat label="Monthly premium" value={money(s.monthly_premium)} sub="in your book" />
+      </div>
+
+      {error && <div style={{ marginBottom: 16 }}><ErrorBox message={error} onRetry={load} /></div>}
+
+      {isEmptyBook ? (
+        <Empty
+          title="Your Book is empty"
+          body="Add a client household and their policy. Thank-you texts, draft-day check-ins, 30/60/90-day check-ins, annual reviews and birthdays will show up here automatically."
+          action={<a href="/app/book/new" style={{ ...btn.primary, textDecoration: 'none' }}>Add your first client</a>}
+        />
+      ) : (
+        <>
+          {data.overdue.length > 0 && (
+            <Section label={`Overdue · ${data.overdue.length}`}>
+              {data.overdue.map(it => <FollowUpCard key={it.id} item={it} today={data.date} onChanged={load} />)}
+            </Section>
+          )}
+
+          <Section label={`Today · ${data.today.length}`}>
+            {data.today.length
+              ? data.today.map(it => <FollowUpCard key={it.id} item={it} today={data.date} onChanged={load} />)
+              : <div style={{ ...type.bodySub, padding: '4px 2px' }}>{data.overdue.length ? 'Nothing else due today.' : 'You’re all caught up for today. ✓'}</div>}
+          </Section>
+
+          <Section
+            label={`Coming up this week · ${data.this_week.length}`}
+            right={data.this_week.length > 0 && <button onClick={() => setShowWeek(v => !v)} style={btn.ghost}>{showWeek ? 'Hide' : 'Show'}</button>}
+          >
+            {data.this_week.length === 0
+              ? <div style={{ ...type.bodySub, padding: '4px 2px' }}>Nothing scheduled for the next 7 days.</div>
+              : showWeek && data.this_week.map(it => <FollowUpCard key={it.id} item={it} today={data.date} onChanged={load} compact />)}
+          </Section>
+        </>
+      )}
     </div>
   )
 }
 
-const KPI = ({ label, value, accent }) => (
-  <div style={statTile}>
+const Stat = ({ label, value, sub, accent }) => (
+  <div style={{ ...statTile, flex: '1 1 140px', minWidth: 140 }}>
     <span style={type.eyebrow}>{label}</span>
     <span style={{ ...type.metric, color: accent || c.text }}>{value}</span>
+    {sub && <span style={type.meta}>{sub}</span>}
   </div>
 )
 
-const SectionHeader = ({ label, action }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
-    <span style={type.eyebrow}>{label}</span>
-    {action}
-  </div>
+const Section = ({ label, right, children }) => (
+  <section style={{ marginBottom: 28 }}>
+    <SectionLabel right={right}>{label}</SectionLabel>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>{children}</div>
+  </section>
 )
-
-const ActionRow = ({ action, onDismiss }) => {
-  const tone = action.tone || 'neutral'
-  const accent = tone === 'urgent' ? c.red : tone === 'warn' ? c.amber : tone === 'info' ? c.indigo : c.dim
-  return (
-    <div style={{
-      ...card,
-      padding: '16px 18px',
-      borderLeft: `3px solid ${accent}`,
-      display: 'flex',
-      gap: 14,
-      alignItems: 'flex-start',
-      flexWrap: 'wrap',
-    }}>
-      <div style={{ flex: 1, minWidth: 220 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-          <span style={{ ...type.eyebrow, color: accent }}>{action.category}</span>
-          {action.priority === 'critical' && (
-            <span style={{ ...chipFor('hot'), border: 'none', background: c.redSoft }}>Urgent</span>
-          )}
-        </div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: c.text, marginBottom: 2 }}>
-          {action.title}
-        </div>
-        <div style={{ ...type.bodySub, fontSize: 13 }}>{action.subtitle}</div>
-        {action.meta && <div style={{ ...type.meta, marginTop: 4 }}>{action.meta}</div>}
-      </div>
-      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-        {action.primaryFn && action.primaryLabel && (
-          <button onClick={action.primaryFn} style={btn.primary}>{action.primaryLabel}</button>
-        )}
-        {action.primaryHref && action.primaryLabel && (
-          <a href={action.primaryHref} style={{ ...btn.primary, textDecoration: 'none' }}>
-            {action.primaryLabel}
-          </a>
-        )}
-        {action.secondaryHref && (
-          <a href={action.secondaryHref} style={{ ...btn.secondary, textDecoration: 'none' }}>
-            {action.secondaryLabel}
-          </a>
-        )}
-        <button onClick={onDismiss} style={btn.ghost} aria-label="Dismiss">Skip</button>
-      </div>
-    </div>
-  )
-}
-
-const EmptyState = ({ isFresh }) => (
-  <div style={{ ...card, padding: '32px 24px', textAlign: 'center' }}>
-    {isFresh ? (
-      <>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 6 }}>Welcome to Brikk</div>
-        <div style={{ ...type.bodySub, marginBottom: 16, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto' }}>
-          Start by adding your current leads. Once your pipeline is in here, this screen will tell you exactly what to do every day.
-        </div>
-        <a href="/app/leads" style={{ ...btn.primary, textDecoration: 'none' }}>Add your first lead</a>
-      </>
-    ) : (
-      <>
-        <div style={{ fontSize: 15, fontWeight: 600, color: c.green, marginBottom: 6 }}>All caught up</div>
-        <div style={{ ...type.bodySub }}>Nothing needs attention right now. Check back later.</div>
-      </>
-    )}
-  </div>
-)
-
-const QuickLink = ({ href, label, sub }) => (
-  <a href={href} style={{
-    ...card, padding: '14px 16px',
-    textDecoration: 'none', display: 'block',
-    transition: 'border-color 0.12s ease, transform 0.08s ease',
-  }}>
-    <div style={{ fontSize: 13, fontWeight: 600, color: c.text }}>{label}</div>
-    <div style={{ ...type.meta, marginTop: 2 }}>{sub}</div>
-  </a>
-)
-
-// Voice modal lives in lib/Voice.js and is mounted globally in app/app/layout.js.
