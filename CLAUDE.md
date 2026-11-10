@@ -1,73 +1,89 @@
 # CLAUDE.md — project memory for Claude Code
 
-This file is loaded into every Claude Code session. Read it first. It's the contract for how to work in this repo.
+Read this first, then `PLAN.md`. This repo is mid-conversion.
 
 ## What this is
 
-**Brikk** — AI CRM + transaction coordinator for solo real estate agents. $69.99/month. Next.js 14 (App Router) on Vercel + Supabase (Postgres/auth/realtime) + Anthropic Claude + Stripe + Resend. Live at brikk.store.
+**Brikk is being rebuilt from a real estate CRM into an all-in-one CRM for life insurance agents.**
+"Brikk" is a placeholder name until Henry picks the new brand (PLAN.md step 6.8).
+The conversion happens **in place**: same Supabase project, same users, same Stripe customers.
+The real-estate version is preserved at commit `5b18164` on `main`.
 
-Full architecture: read `ARCHITECTURE.md`. Database: read `SCHEMA-REFERENCE.md`. When something breaks: `OPERATIONS-RUNBOOK.md`.
+Stack: Next.js 14 (App Router, plain JS) on Vercel + Supabase (Postgres/auth/RLS/realtime) +
+Stripe + Resend. No AI in v1.
 
-## How to work here (non-negotiable conventions)
+## Product goals (the contract)
 
-- **Styling:** ALL colors/fonts/spacing come from `lib/design.js` (`c.text`, `type.eyebrow`, `btn.primary`, `input`, etc.). Never write a raw hex code in a component. Inline `style={{}}` is the pattern — no Tailwind, no CSS modules.
-- **Mobile:** breakpoint 700px. Inputs must be ≥16px font (iOS auto-zoom). Bottom tab bar tap targets ≥44px.
-- **Client/server boundary:** `'use client'` pages run in the browser. `app/api/.../route.js` runs server-only. Service-role keys and secrets NEVER leave `app/api/` or server-imported `lib/`.
-- **Auth on API routes:** every authenticated endpoint must verify the Supabase session from the `Authorization: Bearer` header and derive `userId` from it. NEVER trust a `userId` from the request body. (This was a real vuln — see git history.)
-- **AI calls:** all go through `app/api/copilot/route.js`, dispatched on `body.mode`. Add new AI features as new modes, not new endpoints. Every mode except `help_chat` (public landing chat) requires auth. Browser never calls Anthropic directly.
-- **Supabase queries:** always scope by `user_id` even though RLS enforces it (defense in depth). Every new table gets RLS enabled + a `user_id = auth.uid()` policy.
-- **Stripe:** restricted keys only (`rk_live_`). Price IDs from env vars (`STRIPE_PRICE_PRO/_TEAM`), never hardcoded. Always verify webhook HMAC signatures.
-- **Email:** `lib/email.js → sendEmail()`, always `await` (Vercel kills the function on response).
-- **Dates:** store ISO 8601 UTC. Display via `fmt.relativeDate/daysSince/daysUntil/phone` from `lib/design.js`.
-- **SQL migrations:** new file in `sql/`, idempotent (`IF NOT EXISTS`), RLS for new tables. Henry runs them in Supabase SQL Editor — you can't run them.
+1. **Clients are households**: policyholder, spouse, kids — each person has their own birthday.
+2. **Policy basics per policy** (a household can have several): carrier, product, face amount,
+   monthly premium, application date, effective date, first draft date.
+   **Never store medical or health information anywhere** — no health columns, no health
+   fields in forms or API payloads; notes fields carry a "no health info" warning.
+3. **Automatic follow-ups** generated from policy dates. Default schedule: thank-you (application
+   +1 day), check-in before first draft (first draft −2), payment check (first draft +3), then
+   30/60/90 days and 6 months after the application date, then an annual review every year.
+   Agents can edit the schedule.
+4. **Birthday reminders** for every household member.
+5. **Today dashboard**: who to contact today, with a pre-written text the agent opens and sends
+   from their own phone in one tap via a native `sms:` link. **No Twilio or any texting service.**
+   Never mark a text "sent" automatically — mark it "opened", then ask "Did you send it?".
+6. **Leads section**: a shell for a future lead store. No payments yet.
+7. **iOS/Android apps will be built by someone else on the same backend.** Keep all data and
+   business logic out of the web UI.
 
-## Anti-patterns — do NOT do these
+UI is deliberately simple: the agent's **Book** (formerly Leads) lists every household; each
+household's page is one **timeline** of past and upcoming follow-ups, birthdays and activity.
+Nav: **Today, Book, Leads, Settings**.
 
-- Don't add Tailwind / styled-components / a state library. Inline styles + local `useState` + Supabase Realtime is the convention.
-- Don't import Twilio. It was removed for TCPA reasons; native `sms:` deep links are intentional.
-- Don't put real credentials in code. Use `process.env.X`; document new vars in `.env.example`.
-- Don't write to the DB from public pages (outside `/app`). All writes go through validated `/api/` routes.
-- Don't mark a message as "sent" optimistically — the review flagged this. Log as drafted/opened or confirm on return.
-- Don't claim a git commit succeeded without verifying `git log` — there's a known quirk where commits are reported but don't persist.
+## Architecture rules
 
-## Verification before you call something done
+- `lib/core/` — pure logic (dates, schedule, birthdays, message templates, sms links, today feed).
+  No React, Next or Supabase imports. Unit-tested with `npm test`.
+- `lib/server/` — server-only data access and services. Imported only from `app/api/`.
+- `app/api/v1/` — the versioned JSON API used by **both** web and mobile. Document every endpoint
+  in `API.md`. Breaking changes go to `/api/v2`.
+- `lib/client/api.js` — the browser's only way to read/write data.
+- Pages in `app/app/` must not call `supabase.from(...)` directly or compute business rules.
+  (Old real-estate pages still do; they get replaced or deleted per PLAN.md.)
+- Policy/birthday/follow-up dates are date-only `YYYY-MM-DD`. "Today" is computed in the agent's
+  time zone (`profiles.timezone`). Timestamps are ISO 8601 UTC.
 
-- Run `npm run build` and confirm it compiles. (A duplicate `const` once shipped a build-breaker — always build-check.)
-- Re-read files you edited; this repo lives in OneDrive which can truncate file tails on sync. If a file looks cut off, it probably is — rewrite the tail.
-- For new features, add to `app/roadmap/page.js` SHIPPED only when the UI actually exists. Don't list schema-only features as shipped (two were caught doing this).
+## Conventions (carried over)
 
-## Current priorities (from BRIKK-DEEP-REVIEW.md — read it)
+- **Styling:** colors/fonts/spacing from `lib/design.js`; inline `style={{}}`. No raw hex in
+  components, no Tailwind/CSS modules/state libraries.
+- **Mobile web:** breakpoint 700px; inputs ≥16px font; tap targets ≥44px.
+- **Auth on API routes:** verify the Supabase session from `Authorization: Bearer`; derive
+  `userId` from it. Never trust a `userId` in the body. Whitelist accepted fields.
+- **Supabase:** scope every query by `user_id` even with RLS. Every new table: RLS enabled +
+  `user_id = auth.uid()` policy.
+- **SQL migrations:** new idempotent file in `sql/` (`IF NOT EXISTS`). Additive first; drops only
+  in the final step with Henry's approval. Henry runs them — you can't.
+- **Stripe:** restricted keys only; price IDs from env vars; verify webhook signatures.
+- **Email:** `lib/email.js → sendEmail()`, always `await`.
+- **Secrets:** `process.env.X` only; document new vars in `.env.example`.
 
-The deep review found the product is feature-rich but activation-poor. Priority order:
+## Do NOT
 
-**Retention-critical (do first):**
-1. ✅ Onboarding flow — DONE (`lib/Onboarding.js`, voice-first first-run)
-2. ✅ Label the voice button — DONE ("Talk to Brikk" pill)
-3. Fix the "sent" lie — Copilot + Messages auto-log as sent 300ms after opening sms: even if the agent backs out. Change to confirm-on-return or log as "opened".
-4. Cut mobile bottom bar from 8 tabs to 5; make labels consistent with desktop (ROI=Marketing, Chats=Conversations).
-5. Build the UI for the two schema-only features (listing checklist via `lib/listingTemplates.js` + `checklist_items` table; offer comparison via `offers` table) OR remove them from roadmap SHIPPED.
+- Add Twilio, any SMS provider, or AI/LLM calls (AI is cut for v1).
+- Add any health, medical, medication, underwriting or rate-class field.
+- Put business logic or direct DB writes in pages.
+- Write to the DB from public pages outside `/app` except through validated `/api/` routes.
+- Mark messages "sent" optimistically.
+- List a feature as shipped on the roadmap until its UI exists.
 
-**Before scaling (open code issues):**
-6. Hard-fail if `STRIPE_PRICE_PRO/_TEAM` or `CRON_SECRET` env vars are missing (currently silent fallbacks / public cron).
-7. Webhook idempotency — add a `processed_events` table keyed on Stripe `event.id`.
-8. Rate-limit `/api/refer` and `/api/copilot` per user/IP.
-9. Morning-brief cron pagination — won't scale past ~100-200 users (serial loop + 55s abort).
+## Verification before calling something done
 
-**The real product gaps (next month):**
-10. Comps/CMA tool — the #1 daily reason agents leave Brikk for MLS/Zillow.
-11. Per-deal document storage (Supabase Storage already in stack) + DocuSign status.
-12. Auto-generate per-contingency deadline checklist on contract date (inspection/appraisal/financing/title).
+- `npm run build` compiles; `npm test` passes once tests exist.
+- Re-read edited files: the repo lives in OneDrive, which can truncate file tails on sync.
+- Verify commits with `git log` (known quirk: commits reported but not persisted).
 
-## What you still need a human (Henry) for
+## Needs Henry
 
-- Entering credentials / secrets (set them in Vercel env vars)
-- 2FA on any service
-- Running SQL migrations in Supabase
-- Approving destructive actions (DROP, prod data changes)
-- Apple/Google/Stripe dashboard config
-
-When you need one of these, leave a clear `// TODO(henry):` comment + note it in your summary. Keep coding everything else.
+Credentials/env vars in Vercel, 2FA, running SQL migrations, destructive DB actions, the new
+product name/domain, and Apple/Google/Stripe dashboard config. Leave `// TODO(henry):` and
+mention it in your summary.
 
 ## Last updated
 
-May 21, 2026.
+Nov 10, 2026 — start of the life insurance conversion. Next step: PLAN.md Phase 0.
